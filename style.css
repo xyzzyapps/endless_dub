@@ -177,6 +177,9 @@ select {
 
 .readout.static { gap: 14px; }
 
+.rec-time { color: var(--glow); font-size: 12px; letter-spacing: 0.08em; }
+button.recording { background: #ff5d5d; border-color: #ffb4b4; }
+
 .grids { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 
 .row {

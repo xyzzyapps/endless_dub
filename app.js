@@ -64,6 +64,11 @@ let delayL, delayR, fbL, fbR, dampL, dampR;
 let comp, shaper, analyser;
 let noiseBuf;
 let timer;
+let recorder = null;
+let recordMute = null;
+let recordChunks = [];
+let recordSamples = 0;
+let recording = false;
 let plateEnergy = 0.2;
 let plateStamp = 0;
 let platePhase = 0;
@@ -578,6 +583,118 @@ function applyBase(hex) {
   root.setProperty("--line", "#" + mix(0.72, 0));
 }
 
+function writeAscii(view, offset, text) {
+  for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+}
+
+function wavBlob(chunks, sampleRate) {
+  let sampleCount = 0;
+  for (let i = 0; i < chunks.length; i++) sampleCount += chunks[i].length;
+  const dataBytes = sampleCount * 2;
+  const buffer = new ArrayBuffer(44 + dataBytes);
+  const view = new DataView(buffer);
+  writeAscii(view, 0, "RIFF");
+  view.setUint32(4, 36 + dataBytes, true);
+  writeAscii(view, 8, "WAVE");
+  writeAscii(view, 12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 2, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 4, true);
+  view.setUint16(32, 4, true);
+  view.setUint16(34, 16, true);
+  writeAscii(view, 36, "data");
+  view.setUint32(40, dataBytes, true);
+  const pcm = new Int16Array(buffer, 44);
+  let offset = 0;
+  for (let i = 0; i < chunks.length; i++) {
+    pcm.set(chunks[i], offset);
+    offset += chunks[i].length;
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+function recClock() {
+  const rate = ctx ? ctx.sampleRate : 44100;
+  const secs = Math.floor(recordSamples / rate);
+  const mm = String(Math.floor(secs / 60)).padStart(2, "0");
+  const ss = String(secs % 60).padStart(2, "0");
+  $("recTime").textContent = mm + ":" + ss + " / 30:00";
+}
+
+function downloadWav() {
+  if (!recordChunks.length || !recordSamples) return;
+  const blob = wavBlob(recordChunks, ctx.sampleRate);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  link.href = url;
+  link.download = "endless-dub-" + stamp + ".wav";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function stopRecording() {
+  if (!recording && !recorder) return;
+  recording = false;
+  if (recorder) {
+    recorder.onaudioprocess = null;
+    recorder.disconnect();
+    recorder = null;
+  }
+  if (recordMute) {
+    recordMute.disconnect();
+    recordMute = null;
+  }
+  $("record").textContent = "Record";
+  $("record").classList.remove("recording");
+  downloadWav();
+  recordChunks = [];
+  recordSamples = 0;
+}
+
+function startRecording() {
+  if (!ctx) buildGraph();
+  if (ctx.state === "suspended") ctx.resume();
+  if (recording) return;
+  recordChunks = [];
+  recordSamples = 0;
+  const maxSamples = ctx.sampleRate * 60 * 30;
+  recorder = ctx.createScriptProcessor(4096, 2, 2);
+  recordMute = ctx.createGain();
+  recordMute.gain.value = 0;
+  recorder.onaudioprocess = (event) => {
+    if (!recording) return;
+    const left = event.inputBuffer.getChannelData(0);
+    const right = event.inputBuffer.getChannelData(1);
+    const take = Math.min(left.length, maxSamples - recordSamples);
+    if (take <= 0) {
+      stopRecording();
+      return;
+    }
+    const frame = new Int16Array(take * 2);
+    for (let i = 0; i < take; i++) {
+      const l = Math.max(-1, Math.min(1, left[i]));
+      const r = Math.max(-1, Math.min(1, right[i]));
+      frame[i * 2] = l < 0 ? l * 0x8000 : l * 0x7fff;
+      frame[i * 2 + 1] = r < 0 ? r * 0x8000 : r * 0x7fff;
+    }
+    recordChunks.push(frame);
+    recordSamples += take;
+    if ((recordChunks.length & 7) === 0) recClock();
+    if (recordSamples >= maxSamples) stopRecording();
+  };
+  master.connect(recorder);
+  recorder.connect(recordMute);
+  recordMute.connect(ctx.destination);
+  recording = true;
+  $("recTime").hidden = false;
+  recClock();
+  $("record").textContent = "Stop";
+  $("record").classList.add("recording");
+}
+
 function scheduler() {
   if (!state.playing) return;
   const horizon = ctx.currentTime + 0.12;
@@ -823,6 +940,10 @@ function wire() {
     applyParams();
   });
 
+  $("record").addEventListener("click", () => {
+    if (recording) stopRecording();
+    else startRecording();
+  });
   $("hideUi").addEventListener("click", () => document.body.classList.add("plate-only"));
   $("showUi").addEventListener("click", () => document.body.classList.remove("plate-only"));
 
