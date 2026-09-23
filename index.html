@@ -60,6 +60,20 @@
     </div>
   </section>
 
+  <section class="panel">
+    <h2>Length</h2>
+    <div class="knobs">
+      <label>Kick <input id="kickLen" type="range" min="40" max="900" step="1" value="420"><span id="kickLenVal">420</span></label>
+      <label>Hi-hat <input id="hatLen" type="range" min="8" max="180" step="1" value="30"><span id="hatLenVal">30</span></label>
+      <label>Open <input id="openLen" type="range" min="40" max="800" step="1" value="220"><span id="openLenVal">220</span></label>
+      <label>Snare <input id="snareLen" type="range" min="40" max="600" step="1" value="140"><span id="snareLenVal">140</span></label>
+      <label>Rim <input id="rimLen" type="range" min="20" max="400" step="1" value="70"><span id="rimLenVal">70</span></label>
+      <label>Sub <input id="bassLen" type="range" min="80" max="1600" step="1" value="550"><span id="bassLenVal">550</span></label>
+      <label>Chord <input id="decay" type="range" min="80" max="900" step="1" value="280"><span id="decayVal">280</span></label>
+      <label>Plate <input id="ring" type="range" min="200" max="4200" step="1" value="1800"><span id="ringVal">1800</span></label>
+    </div>
+  </section>
+
   <section class="grids" id="grids"></section>
 
   <section class="panel">
@@ -67,7 +81,6 @@
     <p class="hint">The figure behind the session is the plate. Low frequencies push the wide modes, highs push the fine ones, and the whole pattern brightens with the level of the mix.</p>
     <div class="knobs">
       <label>Tension <input id="tension" type="range" min="40" max="220" step="1" value="100"><span id="tensionVal">1.00</span></label>
-      <label>Ring <input id="ring" type="range" min="40" max="420" step="1" value="180"><span id="ringVal">1.8</span></label>
       <label>Modes <input id="order" type="range" min="2" max="10" step="1" value="6"><span id="orderVal">6</span></label>
     </div>
   </section>
@@ -77,7 +90,6 @@
     <div class="knobs">
       <label>Cutoff <input id="cutoff" type="range" min="180" max="2400" step="1" value="680"><span id="cutoffVal">680</span></label>
       <label>Reso <input id="reso" type="range" min="0" max="18" step="0.1" value="6"><span id="resoVal">6.0</span></label>
-      <label>Decay <input id="decay" type="range" min="80" max="900" step="1" value="280"><span id="decayVal">280</span></label>
       <label>Delay send <input id="send" type="range" min="0" max="100" step="1" value="62"><span id="sendVal">62</span></label>
     </div>
   </section>
@@ -120,7 +132,7 @@
       <label><input id="driftChord" type="checkbox" checked> Chord</label>
       <label><input id="driftBreak" type="checkbox"> Dropouts</label>
     </div>
-    <p class="hint">Levels, root key, tempo, swing, delay time, resonance, drive, and the plate tension stay where you set them.</p>
+    <p class="hint">Levels, note length, root key, tempo, swing, delay time, resonance, drive, and the plate tension stay where you set them. Chord length still drifts when Decay is ticked.</p>
   </section>
 
   <canvas id="scope" width="900" height="88"></canvas>

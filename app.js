@@ -43,6 +43,7 @@ const state = {
   drive: 0.22,
   color: { hex: "#3ec2ff", r: 62, g: 194, b: 255 },
   lvl: { kick: 1, hat: 1, open: 0.85, snare: 1, rim: 1, stab: 1, plate: 0.7 },
+  len: { kick: 0.42, hat: 0.03, open: 0.22, snare: 0.14, rim: 0.07, bass: 0.55 },
   plate: { tension: 1, ring: 1.8, order: 6 },
   drift: {
     cutoff: true,
@@ -210,12 +211,13 @@ function playKick(t) {
   const g = ctx.createGain();
   o.type = "sine";
   o.frequency.setValueAtTime(165, t);
-  o.frequency.exponentialRampToValueAtTime(46, t + 0.07);
+  const kickLen = state.len.kick;
+  o.frequency.exponentialRampToValueAtTime(46, t + Math.min(0.07, kickLen * 0.4));
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(Math.max(0.0001, 0.95 * state.lvl.kick), t + 0.004);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.42);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + kickLen);
   o.connect(g); g.connect(drumBus);
-  o.start(t); o.stop(t + 0.45);
+  o.start(t); o.stop(t + kickLen + 0.03);
   noiseBurst(t, 0.018, "highpass", 1800, 0.7, 0.28 * state.lvl.kick, drumBus);
 
   const duckG = duck.gain;
@@ -229,26 +231,28 @@ function playHat(t, open) {
   const swingDelay = (state.step % 2 === 1) ? (60 / state.bpm) / 4 * state.swing : 0;
   const when = t + swingDelay;
   const level = open ? state.lvl.open : state.lvl.hat;
-  noiseBurst(when, open ? 0.22 : 0.03, "highpass", open ? 5200 : 8000, 0.55, (open ? 0.16 : 0.07) * level, drumBus);
-  if (open) noiseBurst(when, 0.16, "bandpass", 9000, 0.7, 0.05 * level, drumBus);
+  const dur = open ? state.len.open : state.len.hat;
+  noiseBurst(when, dur, "highpass", open ? 5200 : 8000, 0.55, (open ? 0.16 : 0.07) * level, drumBus);
+  if (open) noiseBurst(when, dur * 0.7, "bandpass", 9000, 0.7, 0.05 * level, drumBus);
 }
 
 function playSnare(t) {
   const body = ctx.createOscillator();
   body.type = "triangle";
   body.frequency.setValueAtTime(196, t);
-  body.frequency.exponentialRampToValueAtTime(150, t + 0.12);
   const sn = state.lvl.snare;
-  const bodyGain = envGain(t, 0.002, 0.01, 0.14, 0.28 * sn);
+  const snLen = state.len.snare;
+  body.frequency.exponentialRampToValueAtTime(150, t + Math.min(0.12, snLen));
+  const bodyGain = envGain(t, 0.002, 0.01, snLen, 0.28 * sn);
   body.connect(bodyGain);
   bodyGain.connect(drumBus);
   body.start(t);
-  body.stop(t + 0.2);
+  body.stop(t + snLen + 0.05);
 
   [0, 0.012, 0.024].forEach((offset, i) => {
-    noiseBurst(t + offset, 0.09 - i * 0.02, "bandpass", 1800, 0.8, (0.22 - i * 0.04) * sn, drumBus);
+    noiseBurst(t + offset, Math.max(0.02, snLen * (0.7 - i * 0.15)), "bandpass", 1800, 0.8, (0.22 - i * 0.04) * sn, drumBus);
   });
-  noiseBurst(t, 0.11, "highpass", 2500, 0.5, 0.16 * sn, delaySend);
+  noiseBurst(t, snLen * 0.8, "highpass", 2500, 0.5, 0.16 * sn, delaySend);
 }
 
 function playRim(t) {
@@ -256,11 +260,11 @@ function playRim(t) {
     const o = ctx.createOscillator();
     o.type = "triangle";
     o.frequency.setValueAtTime(freq, t);
-    const g = envGain(t, 0.001, 0, 0.07, (i === 0 ? 0.18 : 0.1) * state.lvl.rim);
+    const g = envGain(t, 0.001, 0, state.len.rim, (i === 0 ? 0.18 : 0.1) * state.lvl.rim);
     o.connect(g); g.connect(drumBus);
-    o.start(t); o.stop(t + 0.1);
+    o.start(t); o.stop(t + state.len.rim + 0.03);
   });
-  noiseBurst(t, 0.02, "bandpass", 1800, 1.2, 0.08 * state.lvl.rim, drumBus);
+  noiseBurst(t, Math.min(0.04, state.len.rim), "bandpass", 1800, 1.2, 0.08 * state.lvl.rim, drumBus);
 }
 
 function playBass(t, step) {
@@ -277,12 +281,13 @@ function playBass(t, step) {
   const f = ctx.createBiquadFilter();
   f.type = "lowpass";
   f.frequency.setValueAtTime(220, t);
-  const g = envGain(t, 0.012, 0.05, 0.55, 0.55 * state.bassLvl);
-  const g2 = envGain(t, 0.02, 0.08, 0.7, 0.45 * state.bassLvl);
+  const bassLen = state.len.bass;
+  const g = envGain(t, 0.012, 0.05, bassLen, 0.55 * state.bassLvl);
+  const g2 = envGain(t, 0.02, 0.08, bassLen * 1.15, 0.45 * state.bassLvl);
   o.connect(f); f.connect(g); g.connect(musicBus);
   sub.connect(g2); g2.connect(musicBus);
   o.start(t); sub.start(t);
-  o.stop(t + 0.8); sub.stop(t + 0.9);
+  o.stop(t + bassLen + 0.15); sub.stop(t + bassLen * 1.15 + 0.15);
 }
 
 function stabNotes() {
@@ -771,7 +776,13 @@ function wire() {
   bindSlider("stabLvl", "stabVal", (el) => Number(el.value), (v) => { state.lvl.stab = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("plateLvl", "plateVal", (el) => Number(el.value), (v) => { state.lvl.plate = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("tension", "tensionVal", (el) => Number(el.value), (v) => { state.plate.tension = v / 100; }, (v) => (v / 100).toFixed(2));
-  bindSlider("ring", "ringVal", (el) => Number(el.value), (v) => { state.plate.ring = v / 100; }, (v) => (v / 100).toFixed(1));
+  bindSlider("ring", "ringVal", (el) => Number(el.value), (v) => { state.plate.ring = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("kickLen", "kickLenVal", (el) => Number(el.value), (v) => { state.len.kick = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("hatLen", "hatLenVal", (el) => Number(el.value), (v) => { state.len.hat = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("openLen", "openLenVal", (el) => Number(el.value), (v) => { state.len.open = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("snareLen", "snareLenVal", (el) => Number(el.value), (v) => { state.len.snare = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("rimLen", "rimLenVal", (el) => Number(el.value), (v) => { state.len.rim = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("bassLen", "bassLenVal", (el) => Number(el.value), (v) => { state.len.bass = v / 1000; }, (v) => String(Math.round(v)));
   bindSlider("order", "orderVal", (el) => Number(el.value), (v) => { state.plate.order = v; }, (v) => String(v));
 
   const driftMap = {
