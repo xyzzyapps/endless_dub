@@ -300,6 +300,16 @@ canvas {
 footer { margin-top: 18px; color: var(--dim); font-size: 12px; }
 footer a { color: var(--accent); }
 
+.show-ui {
+  display: none;
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
+  z-index: 6;
+}
+body.plate-only .app { display: none; }
+body.plate-only .show-ui { display: inline-block; }
+
 @media (max-width: 720px) {
   .panel.two { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr; }

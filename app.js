@@ -823,6 +823,9 @@ function wire() {
     applyParams();
   });
 
+  $("hideUi").addEventListener("click", () => document.body.classList.add("plate-only"));
+  $("showUi").addEventListener("click", () => document.body.classList.remove("plate-only"));
+
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target === document.body) {
       e.preventDefault();
