@@ -40,6 +40,7 @@ const state = {
   reverb: 0.34,
   bassLvl: 0.78,
   drive: 0.22,
+  color: { hex: "#3ec2ff", r: 62, g: 194, b: 255 },
   lvl: { kick: 1, hat: 1, snare: 1, rim: 1, stab: 1, plate: 0.7 },
   plate: { tension: 1, ring: 1.8, order: 6 },
   drift: {
@@ -541,6 +542,23 @@ function shiftChord() {
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
+function applyBase(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  state.color = { hex, r, g, b };
+  const mix = (t, target) => Math.round(r + (target - r) * t).toString(16).padStart(2, "0")
+    + Math.round(g + (target - g) * t).toString(16).padStart(2, "0")
+    + Math.round(b + (target - b) * t).toString(16).padStart(2, "0");
+  const root = document.documentElement.style;
+  root.setProperty("--accent", hex);
+  root.setProperty("--on", hex);
+  root.setProperty("--accent-rgb", r + ", " + g + ", " + b);
+  root.setProperty("--glow", "#" + mix(0.45, 255));
+  root.setProperty("--line", "#" + mix(0.72, 0));
+}
+
 function scheduler() {
   if (!state.playing) return;
   const horizon = ctx.currentTime + 0.12;
@@ -616,9 +634,10 @@ function drawPlate(now) {
       }
       const sand = Math.pow(1 - Math.min(1, Math.abs(z) * 1.7), 3) * (0.25 + plateEnergy);
       const p = (y * w + x) * 4;
-      data[p] = 4 + sand * 30;
-      data[p + 1] = 16 + sand * 90;
-      data[p + 2] = 36 + sand * 210;
+      const col = state.color;
+      data[p] = 4 + sand * col.r;
+      data[p + 1] = 8 + sand * col.g;
+      data[p + 2] = 12 + sand * col.b;
       data[p + 3] = 255;
     }
   }
@@ -635,7 +654,7 @@ function draw(now) {
   c.fillStyle = "#01070f";
   c.fillRect(0, 0, w, h);
   if (!analyser) {
-    c.strokeStyle = "#0c3a66";
+    c.strokeStyle = `rgb(${Math.round(state.color.r * 0.28)}, ${Math.round(state.color.g * 0.28)}, ${Math.round(state.color.b * 0.28)})`;
     c.beginPath();
     c.moveTo(0, h / 2);
     c.lineTo(w, h / 2);
@@ -644,7 +663,7 @@ function draw(now) {
   }
   const data = new Uint8Array(analyser.fftSize);
   analyser.getByteTimeDomainData(data);
-  c.strokeStyle = "#3ec2ff";
+  c.strokeStyle = state.color.hex;
   c.lineWidth = 1.5;
   c.beginPath();
   for (let i = 0; i < data.length; i++) {
@@ -685,6 +704,8 @@ function wire() {
   seedPattern();
   renderGrids();
   $("keyName").textContent = chordName();
+
+  $("baseColor").addEventListener("input", () => applyBase($("baseColor").value));
 
   $("play").addEventListener("click", async () => {
     if (!ctx) buildGraph();
