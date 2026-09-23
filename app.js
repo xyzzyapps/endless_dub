@@ -638,18 +638,31 @@ function drawPlate(now) {
   const img = c.createImageData(w, h);
   const data = img.data;
   const modes = PLATE_MODES.slice(0, state.plate.order);
+  const count = modes.length;
+  const timeAmp = new Float32Array(count);
+  const colSin = new Array(count);
+  const rowSin = new Array(count);
+  const xDenom = w - 1;
+  const yDenom = h - 1;
+  for (let i = 0; i < count; i++) {
+    const m = modes[i][0];
+    const n = modes[i][1];
+    const ratio = Math.sqrt(m * m + n * n);
+    const band = music.bands[i % music.bands.length];
+    const drive = 0.15 + band * 2.4;
+    timeAmp[i] = Math.cos(platePhase * ratio * 0.45) * drive / (1 + i * 0.3);
+    const col = new Float32Array(w);
+    const row = new Float32Array(h);
+    for (let x = 0; x < w; x++) col[x] = Math.sin(Math.PI * m * x / xDenom);
+    for (let y = 0; y < h; y++) row[y] = Math.sin(Math.PI * n * y / yDenom);
+    colSin[i] = col;
+    rowSin[i] = row;
+  }
   for (let y = 0; y < h; y++) {
-    const v = y / (h - 1);
     for (let x = 0; x < w; x++) {
-      const u = x / (w - 1);
       let z = 0;
-      for (let i = 0; i < modes.length; i++) {
-        const m = modes[i][0];
-        const n = modes[i][1];
-        const ratio = Math.sqrt(m * m + n * n);
-        const band = music.bands[i % music.bands.length];
-        const drive = 0.15 + band * 2.4;
-        z += Math.sin(Math.PI * m * u) * Math.sin(Math.PI * n * v) * Math.cos(platePhase * ratio * 0.45) * drive / (1 + i * 0.3);
+      for (let i = 0; i < count; i++) {
+        z += colSin[i][x] * rowSin[i][y] * timeAmp[i];
       }
       const sand = Math.pow(1 - Math.min(1, Math.abs(z) * 1.7), 3) * (0.25 + plateEnergy);
       const p = (y * w + x) * 4;
