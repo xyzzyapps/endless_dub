@@ -5,7 +5,8 @@
 const NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const ROWS = [
   { id: "kick", name: "Kick", cls: "kick" },
-  { id: "hat", name: "Hat", cls: "" },
+  { id: "hat", name: "Hi-hat", cls: "" },
+  { id: "open", name: "Open", cls: "open" },
   { id: "snare", name: "Snare", cls: "snare" },
   { id: "perc", name: "Rim", cls: "" },
   { id: "bass", name: "Sub", cls: "" },
@@ -41,7 +42,7 @@ const state = {
   bassLvl: 0.78,
   drive: 0.22,
   color: { hex: "#3ec2ff", r: 62, g: 194, b: 255 },
-  lvl: { kick: 1, hat: 1, snare: 1, rim: 1, stab: 1, plate: 0.7 },
+  lvl: { kick: 1, hat: 1, open: 0.85, snare: 1, rim: 1, stab: 1, plate: 0.7 },
   plate: { tension: 1, ring: 1.8, order: 6 },
   drift: {
     cutoff: true,
@@ -88,6 +89,11 @@ function makePattern() {
   });
   hat[0] = 0;
 
+  const open = Array(16).fill(0);
+  const openAt = [6, 10, 14][Math.floor(Math.random() * 3)];
+  open[openAt] = 1;
+  if (Math.random() < 0.35) open[(openAt + 8) % 16] = 1;
+
   const snare = Array(16).fill(0);
   snare[4] = 1;
   snare[12] = 1;
@@ -116,13 +122,14 @@ function makePattern() {
   plate[plateAt] = 1;
   if (Math.random() < 0.4) plate[(plateAt + 8) % 16] = 1;
 
-  state.patterns = { kick, hat, snare, perc, bass, stab, plate };
+  state.patterns = { kick, hat, open, snare, perc, bass, stab, plate };
 }
 
 function seedPattern() {
   state.patterns = {
     kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
     hat:  [0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0],
+    open: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
     snare:[0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
     perc: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
     bass: [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
@@ -221,8 +228,9 @@ function playKick(t) {
 function playHat(t, open) {
   const swingDelay = (state.step % 2 === 1) ? (60 / state.bpm) / 4 * state.swing : 0;
   const when = t + swingDelay;
-  const hat = state.lvl.hat;
-  noiseBurst(when, open ? 0.18 : 0.03, "highpass", open ? 6000 : 8000, 0.6, (open ? 0.12 : 0.07) * hat, drumBus);
+  const level = open ? state.lvl.open : state.lvl.hat;
+  noiseBurst(when, open ? 0.22 : 0.03, "highpass", open ? 5200 : 8000, 0.55, (open ? 0.16 : 0.07) * level, drumBus);
+  if (open) noiseBurst(when, 0.16, "bandpass", 9000, 0.7, 0.05 * level, drumBus);
 }
 
 function playSnare(t) {
@@ -464,7 +472,7 @@ function playStep(step, t) {
   const broken = state.breakdown > 0;
   if (p.kick[step] && !broken) playKick(t);
   if (p.hat[step] && Math.random() < (broken ? 0.45 : 0.92)) playHat(t, false);
-  if (step === 14 && Math.random() < 0.28) playHat(t, true);
+  if (p.open[step] && Math.random() < (broken ? 0.4 : 1)) playHat(t, true);
   if (p.snare[step] && !broken) playSnare(t);
   if (p.perc[step] && !broken) playRim(t);
   if (p.bass[step] && !broken) playBass(t, step);
@@ -509,6 +517,12 @@ function mutatePattern() {
   const hat = state.patterns.hat;
   const i = 1 + Math.floor(Math.random() * 15);
   hat[i] = hat[i] ? 0 : 1;
+  if (Math.random() < 0.4) {
+    const open = state.patterns.open;
+    const idx = [2, 6, 10, 14][Math.floor(Math.random() * 4)];
+    open[idx] = open[idx] ? 0 : 1;
+    if (open.reduce((a, b) => a + b, 0) > 3) open[idx] = 0;
+  }
   const stab = state.patterns.stab;
   if (Math.random() < 0.5) {
     const idx = [3, 6, 7, 10, 11, 14][Math.floor(Math.random() * 6)];
@@ -751,6 +765,7 @@ function wire() {
   bindSlider("bassLvl", "bassVal", (el) => Number(el.value), (v) => { state.bassLvl = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("kickLvl", "kickVal", (el) => Number(el.value), (v) => { state.lvl.kick = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("hatLvl", "hatVal", (el) => Number(el.value), (v) => { state.lvl.hat = v / 100; }, (v) => String(Math.round(v)));
+  bindSlider("openLvl", "openVal", (el) => Number(el.value), (v) => { state.lvl.open = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("snareLvl", "snareVal", (el) => Number(el.value), (v) => { state.lvl.snare = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("rimLvl", "rimVal", (el) => Number(el.value), (v) => { state.lvl.rim = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("stabLvl", "stabVal", (el) => Number(el.value), (v) => { state.lvl.stab = v / 100; }, (v) => String(Math.round(v)));
