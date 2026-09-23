@@ -67,6 +67,21 @@ h1 {
   animation: blink 1.05s steps(1) infinite;
 }
 
+.grok-badge {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--accent);
+  color: var(--glow);
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  box-shadow: 0 0 10px rgba(62, 194, 255, 0.35);
+}
+
+.grok-badge:hover { background: rgba(62, 194, 255, 0.12); }
+
 @keyframes blink { 50% { opacity: 0; } }
 
 .lede {
