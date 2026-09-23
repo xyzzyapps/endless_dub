@@ -153,16 +153,16 @@
   <section class="panel">
     <h2>Autopilot may drift</h2>
     <div class="drift">
-      <label><input id="driftCutoff" type="checkbox" checked> Cutoff</label>
-      <label><input id="driftFeedback" type="checkbox" checked> Feedback</label>
-      <label><input id="driftDamp" type="checkbox"> Damp</label>
-      <label><input id="driftReverb" type="checkbox"> Reverb</label>
-      <label><input id="driftDecay" type="checkbox"> Decay</label>
-      <label><input id="driftPattern" type="checkbox" checked> Pattern</label>
-      <label><input id="driftChord" type="checkbox" checked> Chord</label>
-      <label><input id="driftBreak" type="checkbox"> Dropouts</label>
+      <label class="drift-item"><span><input id="driftCutoff" type="checkbox" checked> Cutoff</span><input id="wCutoff" type="range" min="0" max="100" step="1" value="100"><b id="wCutoffVal">100</b></label>
+      <label class="drift-item"><span><input id="driftFeedback" type="checkbox" checked> Feedback</span><input id="wFeedback" type="range" min="0" max="100" step="1" value="25"><b id="wFeedbackVal">25</b></label>
+      <label class="drift-item"><span><input id="driftDamp" type="checkbox"> Damp</span><input id="wDamp" type="range" min="0" max="100" step="1" value="100"><b id="wDampVal">100</b></label>
+      <label class="drift-item"><span><input id="driftReverb" type="checkbox"> Reverb</span><input id="wReverb" type="range" min="0" max="100" step="1" value="100"><b id="wReverbVal">100</b></label>
+      <label class="drift-item"><span><input id="driftDecay" type="checkbox"> Decay</span><input id="wDecay" type="range" min="0" max="100" step="1" value="100"><b id="wDecayVal">100</b></label>
+      <label class="drift-item"><span><input id="driftPattern" type="checkbox" checked> Pattern</span><input id="wPattern" type="range" min="0" max="100" step="1" value="100"><b id="wPatternVal">100</b></label>
+      <label class="drift-item"><span><input id="driftChord" type="checkbox" checked> Chord</span><input id="wChord" type="range" min="0" max="100" step="1" value="100"><b id="wChordVal">100</b></label>
+      <label class="drift-item"><span><input id="driftBreak" type="checkbox"> Dropouts</span><input id="wBreak" type="range" min="0" max="100" step="1" value="100"><b id="wBreakVal">100</b></label>
     </div>
-    <p class="hint">Levels, note length, root key, tempo, swing, delay time, resonance, drive, and the plate tension stay where you set them. Chord length still drifts when Decay is ticked.</p>
+    <p class="hint">The slider under each switch is how far autopilot may wander. Feedback stays a small nudge and will not climb into the noisy range. Levels, note length, root key, tempo, swing, delay time, resonance, drive, and plate tension stay fixed.</p>
   </section>
 
   <footer>

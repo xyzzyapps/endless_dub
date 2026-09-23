@@ -55,6 +55,16 @@ const state = {
     chord: true,
     breakdown: false,
   },
+  weight: {
+    cutoff: 1,
+    feedback: 0.25,
+    damp: 1,
+    reverb: 1,
+    decay: 1,
+    pattern: 1,
+    chord: 1,
+    breakdown: 1,
+  },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -499,55 +509,56 @@ function onBar() {
 
   if (state.bar % 8 === 0) {
     const d = state.drift;
-    if (d.cutoff) state.cutoff = clamp(state.cutoff + (Math.random() * 280 - 140), 220, 1800);
-    if (d.feedback) state.feedback = clamp(state.feedback + (Math.random() * 0.1 - 0.04), 0.45, 0.84);
-    if (d.damp) state.damp = clamp(state.damp + (Math.random() * 700 - 350), 500, 4200);
-    if (d.reverb) state.reverb = clamp(state.reverb + (Math.random() * 0.16 - 0.08), 0.05, 0.8);
-    if (d.decay) state.decay = clamp(state.decay + (Math.random() * 0.16 - 0.08), 0.09, 0.8);
+    const w = state.weight;
+    const sway = (span) => (Math.random() * 2 - 1) * span;
+    if (d.cutoff) state.cutoff = clamp(state.cutoff + sway(140 * w.cutoff), 220, 1800);
+    if (d.feedback) state.feedback = clamp(state.feedback + sway(0.02 * w.feedback), 0.45, 0.75);
+    if (d.damp) state.damp = clamp(state.damp + sway(350 * w.damp), 500, 4200);
+    if (d.reverb) state.reverb = clamp(state.reverb + sway(0.08 * w.reverb), 0.05, 0.8);
+    if (d.decay) state.decay = clamp(state.decay + sway(0.08 * w.decay), 0.09, 0.8);
     syncControls();
     applyParams();
   }
-  if (state.bar % 16 === 0 && state.drift.pattern) {
+  if (state.bar % 16 === 0 && state.drift.pattern && state.weight.pattern > 0) {
     mutatePattern();
     paintGrids();
   }
-  if (state.drift.chord && state.holdBars >= state.minHold && state.bar % 16 === 0 && Math.random() < 0.65) {
+  if (state.drift.chord && state.weight.chord > 0 && state.holdBars >= state.minHold && state.bar % 16 === 0 && Math.random() < 0.65 * state.weight.chord) {
     shiftChord();
   }
-  if (state.drift.breakdown && state.bar % 32 === 0 && Math.random() < 0.7) {
+  if (state.drift.breakdown && state.weight.breakdown > 0 && state.bar % 32 === 0 && Math.random() < 0.7 * state.weight.breakdown) {
     state.breakdown = 4;
-    if (state.drift.feedback) {
-      state.feedback = Math.min(0.86, state.feedback + 0.08);
-      applyParams();
-    }
   }
 }
 
 function mutatePattern() {
+  const w = state.weight.pattern;
   const hat = state.patterns.hat;
-  const i = 1 + Math.floor(Math.random() * 15);
-  hat[i] = hat[i] ? 0 : 1;
-  if (Math.random() < 0.4) {
+  if (Math.random() < w) {
+    const i = 1 + Math.floor(Math.random() * 15);
+    hat[i] = hat[i] ? 0 : 1;
+  }
+  if (Math.random() < 0.4 * w) {
     const open = state.patterns.open;
     const idx = [2, 6, 10, 14][Math.floor(Math.random() * 4)];
     open[idx] = open[idx] ? 0 : 1;
     if (open.reduce((a, b) => a + b, 0) > 3) open[idx] = 0;
   }
   const stab = state.patterns.stab;
-  if (Math.random() < 0.5) {
+  if (Math.random() < 0.5 * w) {
     const idx = [3, 6, 7, 10, 11, 14][Math.floor(Math.random() * 6)];
     stab[idx] = stab[idx] ? 0 : 1;
     if (stab.reduce((a, b) => a + b, 0) < 2) stab[3] = 1;
     if (stab.reduce((a, b) => a + b, 0) > 4) stab[idx] = 0;
   }
   const kick = state.patterns.kick;
-  if (Math.random() < 0.4) kick[8] = kick[8] ? 0 : 1;
+  if (Math.random() < 0.4 * w) kick[8] = kick[8] ? 0 : 1;
   kick[0] = 1;
   const snare = state.patterns.snare;
   snare[4] = 1;
   snare[12] = 1;
-  if (Math.random() < 0.35) snare[13] = snare[13] ? 0 : 1;
-  if (Math.random() < 0.45) {
+  if (Math.random() < 0.35 * w) snare[13] = snare[13] ? 0 : 1;
+  if (Math.random() < 0.45 * w) {
     const plate = state.patterns.plate;
     const idx = [2, 7, 10, 11, 15][Math.floor(Math.random() * 5)];
     plate[idx] = plate[idx] ? 0 : 1;
@@ -933,6 +944,22 @@ function wire() {
   };
   Object.entries(driftMap).forEach(([id, key]) => {
     $(id).addEventListener("change", () => { state.drift[key] = $(id).checked; });
+  });
+  const weightMap = {
+    wCutoff: "cutoff",
+    wFeedback: "feedback",
+    wDamp: "damp",
+    wReverb: "reverb",
+    wDecay: "decay",
+    wPattern: "pattern",
+    wChord: "chord",
+    wBreak: "breakdown",
+  };
+  Object.entries(weightMap).forEach(([id, key]) => {
+    $(id).addEventListener("input", () => {
+      state.weight[key] = Number($(id).value) / 100;
+      $(id + "Val").textContent = $(id).value;
+    });
   });
   bindSlider("drive", "driveVal", (el) => Number(el.value), (v) => { state.drive = v / 100; }, (v) => String(Math.round(v)));
   $("div").addEventListener("change", () => {
