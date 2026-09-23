@@ -61,30 +61,40 @@
   </section>
 
   <section class="panel">
-    <h2>Levels</h2>
-    <div class="knobs faders">
-      <label>Kick <input id="kickLvl" type="range" min="0" max="100" step="1" value="100"><span id="kickVal">100</span></label>
-      <label>Hi-hat <input id="hatLvl" type="range" min="0" max="100" step="1" value="100"><span id="hatVal">100</span></label>
-      <label>Open <input id="openLvl" type="range" min="0" max="100" step="1" value="85"><span id="openVal">85</span></label>
-      <label>Snare <input id="snareLvl" type="range" min="0" max="100" step="1" value="100"><span id="snareVal">100</span></label>
-      <label>Rim <input id="rimLvl" type="range" min="0" max="100" step="1" value="100"><span id="rimVal">100</span></label>
-      <label>Sub <input id="bassLvl" type="range" min="0" max="100" step="1" value="78"><span id="bassVal">78</span></label>
-      <label>Chord <input id="stabLvl" type="range" min="0" max="100" step="1" value="100"><span id="stabVal">100</span></label>
-      <label>Plate <input id="plateLvl" type="range" min="0" max="100" step="1" value="70"><span id="plateVal">70</span></label>
-    </div>
-  </section>
-
-  <section class="panel">
-    <h2>Length</h2>
-    <div class="knobs faders">
-      <label>Kick <input id="kickLen" type="range" min="40" max="900" step="1" value="420"><span id="kickLenVal">420</span></label>
-      <label>Hi-hat <input id="hatLen" type="range" min="8" max="180" step="1" value="30"><span id="hatLenVal">30</span></label>
-      <label>Open <input id="openLen" type="range" min="40" max="800" step="1" value="220"><span id="openLenVal">220</span></label>
-      <label>Snare <input id="snareLen" type="range" min="40" max="600" step="1" value="140"><span id="snareLenVal">140</span></label>
-      <label>Rim <input id="rimLen" type="range" min="20" max="400" step="1" value="70"><span id="rimLenVal">70</span></label>
-      <label>Sub <input id="bassLen" type="range" min="80" max="1600" step="1" value="550"><span id="bassLenVal">550</span></label>
-      <label>Chord <input id="decay" type="range" min="80" max="900" step="1" value="280"><span id="decayVal">280</span></label>
-      <label>Plate <input id="ring" type="range" min="200" max="4200" step="1" value="1800"><span id="ringVal">1800</span></label>
+    <h2>Volume × length</h2>
+    <div class="pairs">
+      <div class="pair"><h3>Kick</h3><div class="knobs faders">
+        <label>Vol <input id="kickLvl" type="range" min="0" max="100" step="1" value="100"><span id="kickVal">100</span></label>
+        <label>Len <input id="kickLen" type="range" min="40" max="900" step="1" value="420"><span id="kickLenVal">420</span></label>
+      </div></div>
+      <div class="pair"><h3>Hi-hat</h3><div class="knobs faders">
+        <label>Vol <input id="hatLvl" type="range" min="0" max="100" step="1" value="100"><span id="hatVal">100</span></label>
+        <label>Len <input id="hatLen" type="range" min="8" max="180" step="1" value="30"><span id="hatLenVal">30</span></label>
+      </div></div>
+      <div class="pair"><h3>Open</h3><div class="knobs faders">
+        <label>Vol <input id="openLvl" type="range" min="0" max="100" step="1" value="85"><span id="openVal">85</span></label>
+        <label>Len <input id="openLen" type="range" min="40" max="800" step="1" value="220"><span id="openLenVal">220</span></label>
+      </div></div>
+      <div class="pair"><h3>Snare</h3><div class="knobs faders">
+        <label>Vol <input id="snareLvl" type="range" min="0" max="100" step="1" value="100"><span id="snareVal">100</span></label>
+        <label>Len <input id="snareLen" type="range" min="40" max="600" step="1" value="140"><span id="snareLenVal">140</span></label>
+      </div></div>
+      <div class="pair"><h3>Rim</h3><div class="knobs faders">
+        <label>Vol <input id="rimLvl" type="range" min="0" max="100" step="1" value="100"><span id="rimVal">100</span></label>
+        <label>Len <input id="rimLen" type="range" min="20" max="400" step="1" value="70"><span id="rimLenVal">70</span></label>
+      </div></div>
+      <div class="pair"><h3>Sub</h3><div class="knobs faders">
+        <label>Vol <input id="bassLvl" type="range" min="0" max="100" step="1" value="78"><span id="bassVal">78</span></label>
+        <label>Len <input id="bassLen" type="range" min="80" max="1600" step="1" value="550"><span id="bassLenVal">550</span></label>
+      </div></div>
+      <div class="pair"><h3>Chord</h3><div class="knobs faders">
+        <label>Vol <input id="stabLvl" type="range" min="0" max="100" step="1" value="100"><span id="stabVal">100</span></label>
+        <label>Len <input id="decay" type="range" min="80" max="900" step="1" value="280"><span id="decayVal">280</span></label>
+      </div></div>
+      <div class="pair"><h3>Plate</h3><div class="knobs faders">
+        <label>Vol <input id="plateLvl" type="range" min="0" max="100" step="1" value="70"><span id="plateVal">70</span></label>
+        <label>Len <input id="ring" type="range" min="200" max="4200" step="1" value="1800"><span id="ringVal">1800</span></label>
+      </div></div>
     </div>
   </section>
 
