@@ -669,7 +669,7 @@ function startVideo() {
   recordCtx = recordCanvas.getContext("2d", { alpha: false });
   recordCtx.fillStyle = "#01070f";
   recordCtx.fillRect(0, 0, recordCanvas.width, recordCanvas.height);
-  const plateStream = recordCanvas.captureStream(15);
+  const plateStream = recordCanvas.captureStream(25);
   recordDest = ctx.createMediaStreamDestination();
   master.connect(recordDest);
   const stream = new MediaStream([
