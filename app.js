@@ -79,6 +79,13 @@ let recordMute = null;
 let recordChunks = [];
 let recordSamples = 0;
 let recording = false;
+let recordStopping = false;
+let recordStamp = "";
+let mediaRecorder = null;
+let recordDest = null;
+let recordCanvas = null;
+let recordCtx = null;
+let videoChunks = [];
 let plateEnergy = 0.2;
 let plateStamp = 0;
 let platePhase = 0;
@@ -641,14 +648,75 @@ function downloadWav() {
   const link = document.createElement("a");
   const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
   link.href = url;
-  link.download = "endless-dub-" + stamp + ".wav";
+  link.download = "endless-dub-" + (recordStamp || stamp) + ".wav";
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+function videoType() {
+  if (!window.MediaRecorder) return "";
+  const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+  return types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+function startVideo() {
+  const mime = videoType();
+  if (!mime || !HTMLCanvasElement.prototype.captureStream) return;
+  recordCanvas = document.createElement("canvas");
+  const aspect = window.innerWidth / Math.max(1, window.innerHeight);
+  recordCanvas.height = 720;
+  recordCanvas.width = Math.max(720, Math.min(1280, Math.round(720 * aspect)));
+  recordCtx = recordCanvas.getContext("2d", { alpha: false });
+  recordCtx.fillStyle = "#01070f";
+  recordCtx.fillRect(0, 0, recordCanvas.width, recordCanvas.height);
+  const plateStream = recordCanvas.captureStream(15);
+  recordDest = ctx.createMediaStreamDestination();
+  master.connect(recordDest);
+  const stream = new MediaStream([
+    plateStream.getVideoTracks()[0],
+    recordDest.stream.getAudioTracks()[0],
+  ]);
+  videoChunks = [];
+  mediaRecorder = new MediaRecorder(stream, {
+    mimeType: mime,
+    videoBitsPerSecond: 2000000,
+    audioBitsPerSecond: 160000,
+  });
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data && event.data.size) videoChunks.push(event.data);
+  };
+  mediaRecorder.onstop = () => {
+    const type = mediaRecorder.mimeType || mime;
+    const ext = type.indexOf("mp4") >= 0 ? "mp4" : "webm";
+    const blob = new Blob(videoChunks, { type });
+    videoChunks = [];
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "endless-dub-" + recordStamp + "." + ext;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    plateStream.getTracks().forEach((track) => track.stop());
+    mediaRecorder = null;
+  };
+  mediaRecorder.start(1000);
+}
+
+function stopVideo() {
+  recordCtx = null;
+  if (recordDest) {
+    try { master.disconnect(recordDest); } catch (err) { /* already disconnected */ }
+    recordDest = null;
+  }
+  if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+}
+
 function stopRecording() {
+  if (recordStopping) return;
   if (!recording && !recorder) return;
+  recordStopping = true;
   recording = false;
+  stopVideo();
   if (recorder) {
     recorder.onaudioprocess = null;
     recorder.disconnect();
@@ -663,6 +731,7 @@ function stopRecording() {
   downloadWav();
   recordChunks = [];
   recordSamples = 0;
+  recordStopping = false;
 }
 
 function startRecording() {
@@ -671,6 +740,15 @@ function startRecording() {
   if (recording) return;
   recordChunks = [];
   recordSamples = 0;
+  recordStamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  try { startVideo(); } catch (err) {
+    recordCtx = null;
+    if (recordDest) {
+      try { master.disconnect(recordDest); } catch (ignore) { /* no tap yet */ }
+      recordDest = null;
+    }
+    mediaRecorder = null;
+  }
   const maxSamples = ctx.sampleRate * 60 * 30;
   recorder = ctx.createScriptProcessor(4096, 2, 2);
   recordMute = ctx.createGain();
@@ -812,7 +890,10 @@ function draw(now) {
   requestAnimationFrame(draw);
   plateFrame += 1;
   const phone = window.innerWidth < 800;
-  if (!phone || plateFrame % 2 === 0) drawPlate(now || performance.now());
+  if (!phone || plateFrame % 2 === 0 || recording) drawPlate(now || performance.now());
+  if (recording && recordCtx) {
+    recordCtx.drawImage($("plate"), 0, 0, recordCanvas.width, recordCanvas.height);
+  }
   const canvas = $("scope");
   const c = canvas.getContext("2d");
   const w = canvas.width;
