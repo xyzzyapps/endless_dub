@@ -592,8 +592,10 @@ function scheduler() {
 
 function fitPlate() {
   const canvas = $("plate");
-  const w = Math.max(180, Math.round(window.innerWidth / 5));
-  const h = Math.max(100, Math.round(window.innerHeight / 5));
+  const phone = window.innerWidth < 800;
+  const div = phone ? 10 : 5;
+  const w = Math.max(phone ? 80 : 180, Math.round(window.innerWidth / div));
+  const h = Math.max(phone ? 48 : 100, Math.round(window.innerHeight / div));
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
@@ -676,9 +678,13 @@ function drawPlate(now) {
   c.putImageData(img, 0, 0);
 }
 
+let plateFrame = 0;
+
 function draw(now) {
   requestAnimationFrame(draw);
-  drawPlate(now || performance.now());
+  plateFrame += 1;
+  const phone = window.innerWidth < 800;
+  if (!phone || plateFrame % 2 === 0) drawPlate(now || performance.now());
   const canvas = $("scope");
   const c = canvas.getContext("2d");
   const w = canvas.width;
@@ -822,6 +828,33 @@ function wire() {
       e.preventDefault();
       $("play").click();
     }
+  });
+
+  document.querySelectorAll(".faders input[type=range]").forEach((input) => {
+    const slot = document.createElement("span");
+    slot.className = "fader";
+    input.parentNode.insertBefore(slot, input);
+    slot.appendChild(input);
+    const setFromY = (clientY) => {
+      const rect = slot.getBoundingClientRect();
+      const t = 1 - (clientY - rect.top) / rect.height;
+      const min = Number(input.min);
+      const max = Number(input.max);
+      const step = Number(input.step) || 1;
+      const clamped = Math.min(1, Math.max(0, t));
+      const raw = min + clamped * (max - min);
+      const stepped = Math.round((raw - min) / step) * step + min;
+      input.value = String(Math.min(max, Math.max(min, stepped)));
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    slot.addEventListener("pointerdown", (e) => {
+      slot.setPointerCapture(e.pointerId);
+      setFromY(e.clientY);
+      e.preventDefault();
+    });
+    slot.addEventListener("pointermove", (e) => {
+      if (slot.hasPointerCapture(e.pointerId)) setFromY(e.clientY);
+    });
   });
 
   draw();

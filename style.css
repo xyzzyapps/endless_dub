@@ -13,9 +13,12 @@
 
 * { box-sizing: border-box; }
 
+html { -webkit-text-size-adjust: 100%; }
+
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg);
   color: var(--ink);
   font: 14px/1.45 ui-monospace, "Cascadia Mono", "IBM Plex Mono", Consolas, monospace;
@@ -40,7 +43,7 @@ body::before {
 .app {
   max-width: 980px;
   margin: 0 auto;
-  padding: 28px 18px 48px;
+  padding: calc(28px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left));
   position: relative;
   z-index: 1;
 }
@@ -115,6 +118,7 @@ button {
   border-radius: 0;
   padding: 6px 14px;
   cursor: pointer;
+  touch-action: manipulation;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   text-shadow: none;
@@ -203,6 +207,7 @@ select {
   background: #01070f;
   cursor: pointer;
   padding: 0;
+  touch-action: manipulation;
 }
 
 .step.on {
@@ -245,13 +250,22 @@ select {
   color: var(--dim);
 }
 .faders { align-items: flex-end; gap: 6px; }
-.faders label { align-items: center; width: 46px; }
-.faders input[type="range"] {
-  writing-mode: vertical-lr;
-  direction: rtl;
-  width: 22px;
-  height: 108px;
+.faders label { align-items: center; width: 44px; }
+.fader {
+  position: relative;
+  width: 44px;
+  height: 128px;
+  touch-action: none;
+}
+.fader input[type="range"] {
+  position: absolute;
+  width: 128px;
+  height: 44px;
+  left: 50%;
+  top: 50%;
   margin: 0;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  pointer-events: none;
 }
 
 canvas {
@@ -267,7 +281,9 @@ canvas {
   position: fixed;
   inset: 0;
   width: 100vw;
+  width: 100dvw;
   height: 100vh;
+  height: 100dvh;
   z-index: 0;
   border: 0;
   pointer-events: none;
@@ -284,5 +300,8 @@ footer a { color: var(--accent); }
   .panel.two { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr; }
   input[type="range"] { width: 100%; }
-  .faders input[type="range"] { width: 22px; }
+  .fader input[type="range"] { width: 128px; }
+  button, select { font-size: 16px; min-height: 44px; }
+  .step { height: 44px; }
+  .pairs { justify-content: space-between; }
 }
