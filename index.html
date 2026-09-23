@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endless Dub</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="plate" width="480" height="270"></canvas>
+<div class="app">
+  <header>
+    <div>
+      <p class="prompt">dub@session:~</p>
+      <h1>ENDLESS_DUB<span class="caret">█</span></h1>
+    </div>
+    <p class="lede">A slow generative dub techno jam. One chord, a sub, a dry kick, and a delay that keeps the room ringing. Leave autopilot on and let it drift.</p>
+  </header>
+
+  <section class="transport">
+    <button id="play" type="button">Play</button>
+    <label class="readout">BPM <input id="bpm" type="range" min="112" max="132" step="1" value="122"><span id="bpmVal">122</span></label>
+    <label class="readout">Swing <input id="swing" type="range" min="0" max="40" step="1" value="14"><span id="swingVal">14</span></label>
+    <label class="readout">Root
+      <select id="root">
+        <option value="0">C</option>
+        <option value="1">C#</option>
+        <option value="2" selected>D</option>
+        <option value="3">Eb</option>
+        <option value="4">E</option>
+        <option value="5">F</option>
+        <option value="6">F#</option>
+        <option value="7">G</option>
+        <option value="8">Ab</option>
+        <option value="9">A</option>
+        <option value="10">Bb</option>
+        <option value="11">B</option>
+      </select>
+    </label>
+    <div class="readout static"><span id="keyName">D minor</span><span id="barCount">bar 1</span></div>
+    <label class="toggle"><input id="autopilot" type="checkbox" checked> Autopilot</label>
+    <button id="regen" type="button" class="ghost">New pattern</button>
+    <button id="chord" type="button" class="ghost">New chord</button>
+  </section>
+
+  <section class="panel">
+    <h2>Levels</h2>
+    <div class="knobs">
+      <label>Kick <input id="kickLvl" type="range" min="0" max="100" step="1" value="100"><span id="kickVal">100</span></label>
+      <label>Hat <input id="hatLvl" type="range" min="0" max="100" step="1" value="100"><span id="hatVal">100</span></label>
+      <label>Snare <input id="snareLvl" type="range" min="0" max="100" step="1" value="100"><span id="snareVal">100</span></label>
+      <label>Rim <input id="rimLvl" type="range" min="0" max="100" step="1" value="100"><span id="rimVal">100</span></label>
+      <label>Sub <input id="bassLvl" type="range" min="0" max="100" step="1" value="78"><span id="bassVal">78</span></label>
+      <label>Chord <input id="stabLvl" type="range" min="0" max="100" step="1" value="100"><span id="stabVal">100</span></label>
+      <label>Plate <input id="plateLvl" type="range" min="0" max="100" step="1" value="70"><span id="plateVal">70</span></label>
+    </div>
+  </section>
+
+  <section class="grids" id="grids"></section>
+
+  <section class="panel">
+    <h2>Cymatics plate</h2>
+    <p class="hint">The figure behind the session is the plate. Low frequencies push the wide modes, highs push the fine ones, and the whole pattern brightens with the level of the mix.</p>
+    <div class="knobs">
+      <label>Tension <input id="tension" type="range" min="40" max="220" step="1" value="100"><span id="tensionVal">1.00</span></label>
+      <label>Ring <input id="ring" type="range" min="40" max="420" step="1" value="180"><span id="ringVal">1.8</span></label>
+      <label>Modes <input id="order" type="range" min="2" max="10" step="1" value="6"><span id="orderVal">6</span></label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Chord stab</h2>
+    <div class="knobs">
+      <label>Cutoff <input id="cutoff" type="range" min="180" max="2400" step="1" value="680"><span id="cutoffVal">680</span></label>
+      <label>Reso <input id="reso" type="range" min="0" max="18" step="0.1" value="6"><span id="resoVal">6.0</span></label>
+      <label>Decay <input id="decay" type="range" min="80" max="900" step="1" value="280"><span id="decayVal">280</span></label>
+      <label>Delay send <input id="send" type="range" min="0" max="100" step="1" value="62"><span id="sendVal">62</span></label>
+    </div>
+  </section>
+
+  <section class="panel two">
+    <div>
+      <h2>Dub delay</h2>
+      <div class="knobs">
+        <label>Time
+          <select id="div">
+            <option value="0.75" selected>dotted 1/8</option>
+            <option value="0.5">1/8</option>
+            <option value="1">1/4</option>
+            <option value="1.5">dotted 1/4</option>
+            <option value="0.375">dotted 1/16</option>
+          </select>
+        </label>
+        <label>Feedback <input id="feedback" type="range" min="20" max="88" step="1" value="70"><span id="feedbackVal">70</span></label>
+        <label>Damp <input id="damp" type="range" min="400" max="5000" step="1" value="1400"><span id="dampVal">1400</span></label>
+      </div>
+    </div>
+    <div>
+      <h2>Room</h2>
+      <div class="knobs">
+        <label>Reverb <input id="reverb" type="range" min="0" max="100" step="1" value="34"><span id="reverbVal">34</span></label>
+        <label>Drive <input id="drive" type="range" min="0" max="100" step="1" value="22"><span id="driveVal">22</span></label>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Autopilot may drift</h2>
+    <div class="drift">
+      <label><input id="driftCutoff" type="checkbox" checked> Cutoff</label>
+      <label><input id="driftFeedback" type="checkbox" checked> Feedback</label>
+      <label><input id="driftDamp" type="checkbox"> Damp</label>
+      <label><input id="driftReverb" type="checkbox"> Reverb</label>
+      <label><input id="driftDecay" type="checkbox"> Decay</label>
+      <label><input id="driftPattern" type="checkbox" checked> Pattern</label>
+      <label><input id="driftChord" type="checkbox" checked> Chord</label>
+      <label><input id="driftBreak" type="checkbox"> Dropouts</label>
+    </div>
+    <p class="hint">Levels, root key, tempo, swing, delay time, resonance, drive, and the plate tension stay where you set them.</p>
+  </section>
+
+  <canvas id="scope" width="900" height="88"></canvas>
+
+  <footer>
+    <p>Inspired by the interaction of <a href="https://www.vitling.xyz/toys/acid-banger/">Vitling’s Endless Acid Banger</a> and <a href="https://zykure.github.io/acid-banger/">Zykure’s spicy version</a> (CC BY 4.0). This session is a separate piece: slower, minor, and built around a filtered dub delay.</p>
+    <p>Required Notice: Copyright 2026 Xyzzy Apps. <a href="https://polyformproject.org/licenses/noncommercial/1.0.0">PolyForm Noncommercial 1.0.0</a>.</p>
+  </footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
