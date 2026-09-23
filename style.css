@@ -275,4 +275,5 @@ footer a { color: var(--accent); }
   .panel.two { grid-template-columns: 1fr; }
   .row { grid-template-columns: 1fr; }
   input[type="range"] { width: 100%; }
+  .faders input[type="range"] { width: 22px; }
 }
