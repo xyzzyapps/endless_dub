@@ -1131,6 +1131,13 @@ function wire() {
     renderGrids();
   });
   $("chord").addEventListener("click", () => shiftChord());
+  $("clear").addEventListener("click", () => {
+    ROWS.forEach((row) => {
+      state.patterns[row.id] = Array(16).fill(0);
+      state.stepWeight[row.id] = Array(16).fill(0);
+    });
+    paintGrids();
+  });
   $("root").addEventListener("change", () => {
     state.root = 48 + Number($("root").value);
     $("keyName").textContent = chordName();
