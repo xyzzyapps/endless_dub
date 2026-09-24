@@ -413,7 +413,19 @@ body.plate-only .show-ui { display: inline-block; }
   .row { grid-template-columns: 1fr; }
   input[type="range"] { width: 100%; }
   .fader input[type="range"] { width: 128px; }
-  button, select { font-size: 16px; min-height: 44px; }
+  button, select, #email { font-size: 16px; min-height: 44px; }
   .step { height: 44px; }
   .pairs { justify-content: space-between; }
+  #account {
+    flex-direction: column;
+    align-items: stretch;
+    padding-left: calc(12px + env(safe-area-inset-left));
+    padding-right: calc(12px + env(safe-area-inset-right));
+  }
+  #accountStatus { overflow-wrap: anywhere; }
+  #email { width: 100%; min-width: 0; box-sizing: border-box; }
+  .account-row { width: 100%; }
+  .account-row button { flex: 1; }
+  .app { padding-top: calc(210px + env(safe-area-inset-top)); }
+  .show-ui { top: calc(200px + env(safe-area-inset-top)); }
 }

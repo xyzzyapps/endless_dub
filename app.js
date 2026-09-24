@@ -1330,7 +1330,87 @@ const cloud = window.supabase.createClient(
   "sb_publishable_aDHg7fY5PRHLad4ctOcOKA_M71z58XD"
 );
 
+const SONG_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 let songId = new URLSearchParams(location.search).get("song");
+if (songId && !SONG_ID.test(songId)) songId = null;
+
+function clampNum(value, lo, hi, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(hi, Math.max(lo, n));
+}
+
+function bits16(row) {
+  const out = Array(16).fill(0);
+  if (!Array.isArray(row)) return out;
+  for (let i = 0; i < 16; i++) out[i] = row[i] ? 1 : 0;
+  return out;
+}
+
+function weights16(row) {
+  const out = STEP_CURVE.slice();
+  if (!Array.isArray(row)) return out;
+  for (let i = 0; i < 16; i++) out[i] = clampNum(row[i], 0, 1, out[i]);
+  return out;
+}
+
+function cleanSnapshot(data) {
+  const src = data && typeof data === "object" ? data : {};
+  const patterns = {};
+  const stepWeight = {};
+  ROWS.forEach((row) => {
+    patterns[row.id] = bits16(src.patterns && src.patterns[row.id]);
+    stepWeight[row.id] = weights16(src.stepWeight && src.stepWeight[row.id]);
+  });
+  const delays = [0.375, 0.5, 0.75, 1, 1.5];
+  const delayBeats = delays.includes(Number(src.delayBeats)) ? Number(src.delayBeats) : 0.75;
+  const color = /^#[0-9a-fA-F]{6}$/.test(src.color) ? src.color : "#3ec2ff";
+  const drift = {};
+  const weight = {};
+  ["cutoff", "feedback", "damp", "reverb", "decay", "pattern", "chord", "breakdown", "send", "width", "reso", "swing"].forEach((key) => {
+    drift[key] = !!(src.drift && src.drift[key]);
+    weight[key] = clampNum(src.weight && src.weight[key], 0, 1, 1);
+  });
+  const lvl = {};
+  const len = {};
+  ["kick", "hat", "open", "snare", "rim", "stab", "plate"].forEach((id) => {
+    lvl[id] = clampNum(src.lvl && src.lvl[id], 0, 1, id === "plate" ? 0 : 1);
+  });
+  ["kick", "hat", "open", "snare", "rim", "bass"].forEach((id) => {
+    len[id] = clampNum(src.len && src.len[id], 0.008, 1.6, 0.2);
+  });
+  return {
+    patterns,
+    stepWeight,
+    bpm: clampNum(src.bpm, 112, 132, 122),
+    swing: clampNum(src.swing, 0, 0.4, 0.14),
+    root: 48 + clampNum(((Number(src.root) % 12) + 12) % 12, 0, 11, 2),
+    degree: clampNum(src.degree, -12, 24, 0),
+    delayBeats,
+    feedback: clampNum(src.feedback, 0.2, 0.88, 0.7),
+    damp: clampNum(src.damp, 400, 5000, 1400),
+    cutoff: clampNum(src.cutoff, 160, 2400, 680),
+    reso: clampNum(src.reso, 0, 18, 6),
+    decay: clampNum(src.decay, 0.08, 0.9, 0.28),
+    send: clampNum(src.send, 0, 1, 0.62),
+    reverb: clampNum(src.reverb, 0, 1, 0.34),
+    bassLvl: clampNum(src.bassLvl, 0, 1, 0.78),
+    drive: clampNum(src.drive, 0, 1, 0.22),
+    srs: clampNum(src.srs, 0, 1, 0.68),
+    color,
+    lvl,
+    len,
+    plate: {
+      tension: clampNum(src.plate && src.plate.tension, 0.4, 2.2, 1),
+      ring: clampNum(src.plate && src.plate.ring, 0.2, 4.2, 1.8),
+      order: Math.round(clampNum(src.plate && src.plate.order, 2, 10, 6)),
+    },
+    drift,
+    weight,
+    autopilot: src.autopilot !== false,
+    cutoffGlide: src.cutoffGlide !== false,
+  };
+}
 
 function siteUrl() {
   return location.origin + location.pathname;
@@ -1366,7 +1446,8 @@ function songSnapshot() {
   };
 }
 
-function applySnapshot(data) {
+function applySnapshot(raw) {
+  const data = cleanSnapshot(raw);
   const set = (id, value) => {
     const el = $(id);
     if (!el) return;
@@ -1510,6 +1591,10 @@ async function setupAccount() {
       $("accountStatus").textContent = inserted.error.message;
       return;
     }
+    if (!SONG_ID.test(inserted.data.id)) {
+      $("accountStatus").textContent = "Save returned an unexpected id.";
+      return;
+    }
     songId = inserted.data.id;
     history.replaceState(null, "", siteUrl() + "?song=" + songId);
     $("accountStatus").textContent = "Saved. Copy link to share it.";
@@ -1520,8 +1605,12 @@ async function setupAccount() {
       return;
     }
     const link = siteUrl() + "?song=" + songId;
-    await navigator.clipboard.writeText(link);
-    $("accountStatus").textContent = "Link copied.";
+    try {
+      await navigator.clipboard.writeText(link);
+      $("accountStatus").textContent = "Link copied.";
+    } catch (err) {
+      $("accountStatus").textContent = link;
+    }
   });
   if (songId) await loadSong(songId);
 }
