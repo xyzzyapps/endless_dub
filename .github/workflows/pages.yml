@@ -25,7 +25,7 @@ jobs:
       - name: Collect site files
         run: |
           mkdir public
-          cp index.html app.js style.css preview.png public/
+          cp index.html app.js style.css preview.png favicon.svg public/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
