@@ -126,6 +126,17 @@ h1 {
   padding: 12px;
   margin-bottom: 12px;
 }
+.pattern-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  align-items: center;
+}
+#clear {
+  border-width: 2px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
 
 button {
   font: inherit;
