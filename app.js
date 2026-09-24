@@ -1565,13 +1565,6 @@ async function setupAccount() {
     });
     $("accountStatus").textContent = error ? error.message : "Check your email for the sign-in link.";
   });
-  $("googleSign").addEventListener("click", async () => {
-    const { error } = await cloud.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: siteUrl() },
-    });
-    if (error) $("accountStatus").textContent = error.message;
-  });
   $("signOut").addEventListener("click", () => cloud.auth.signOut());
   $("saveSong").addEventListener("click", async () => {
     const { data: userData } = await cloud.auth.getUser();
