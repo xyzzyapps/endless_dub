@@ -65,6 +65,11 @@ const state = {
     chord: 1,
     breakdown: 1,
   },
+  stepWeight: [1, 0.35, 0.55, 0.3, 0.85, 0.4, 0.6, 0.3, 0.9, 0.35, 0.55, 0.3, 0.85, 0.4, 0.7, 0.3],
+  cutoffTarget: 680,
+  cutoffRetarget: 0,
+  cutoffStamp: 0,
+  cutoffUi: 0,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -102,48 +107,69 @@ function chordName() {
   return name + " " + flavors[Math.abs(state.degree) % flavors.length];
 }
 
-function makePattern() {
-  const kick = Array.from({ length: 16 }, (_, i) => (i % 4 === 0 ? 1 : 0));
-  if (Math.random() < 0.35) kick[8] = 0;
+function hit(step, base) {
+  return Math.random() < base * state.stepWeight[step];
+}
 
-  const hat = Array.from({ length: 16 }, (_, i) => {
-    if (i % 2 === 0) return Math.random() < 0.35 ? 1 : 0;
-    return Math.random() < 0.72 ? 1 : 0;
-  });
+function pickWeighted(pool) {
+  let total = 0;
+  for (let i = 0; i < pool.length; i++) total += Math.max(0.04, state.stepWeight[pool[i]]);
+  let r = Math.random() * total;
+  for (let i = 0; i < pool.length; i++) {
+    r -= Math.max(0.04, state.stepWeight[pool[i]]);
+    if (r <= 0) return pool[i];
+  }
+  return pool[pool.length - 1];
+}
+
+function makePattern() {
+  const kick = Array.from({ length: 16 }, (_, i) => (i % 4 === 0 && hit(i, 0.95) ? 1 : 0));
+  if (!kick.some((v) => v)) kick[pickWeighted([0, 4, 8, 12])] = 1;
+
+  const hat = Array.from({ length: 16 }, (_, i) => (hit(i, i % 2 === 0 ? 0.35 : 0.72) ? 1 : 0));
   hat[0] = 0;
 
   const open = Array(16).fill(0);
-  const openAt = [6, 10, 14][Math.floor(Math.random() * 3)];
-  open[openAt] = 1;
-  if (Math.random() < 0.35) open[(openAt + 8) % 16] = 1;
+  open[pickWeighted([6, 10, 14])] = 1;
+  if (Math.random() < 0.35) {
+    const extra = pickWeighted([6, 10, 14]);
+    if (hit(extra, 1)) open[extra] = 1;
+  }
 
   const snare = Array(16).fill(0);
-  snare[4] = 1;
-  snare[12] = 1;
-  if (Math.random() < 0.3) snare[13] = 1;
+  if (hit(4, 0.95)) snare[4] = 1;
+  if (hit(12, 0.95)) snare[12] = 1;
+  if (!snare[4] && !snare[12]) snare[pickWeighted([4, 12])] = 1;
+  if (hit(13, 0.3)) snare[13] = 1;
 
   const perc = Array(16).fill(0);
-  perc[6] = 1;
-  if (Math.random() < 0.7) perc[14] = 1;
-  if (Math.random() < 0.25) perc[10] = 1;
+  if (hit(6, 0.9)) perc[6] = 1;
+  if (hit(14, 0.7)) perc[14] = 1;
+  if (hit(10, 0.25)) perc[10] = 1;
 
   const bass = Array(16).fill(0);
-  bass[0] = 1;
-  const off = [6, 7, 10, 14][Math.floor(Math.random() * 4)];
-  bass[off] = 1;
-  if (Math.random() < 0.4) bass[8] = 1;
+  if (hit(0, 1)) bass[0] = 1;
+  const off = pickWeighted([6, 7, 10, 14]);
+  if (hit(off, 0.85)) bass[off] = 1;
+  if (hit(8, 0.4)) bass[8] = 1;
+  if (!bass.some((v) => v)) bass[0] = 1;
 
   const stab = Array(16).fill(0);
   const candidates = [3, 6, 7, 10, 11, 14];
   const hits = 2 + Math.floor(Math.random() * 2);
-  const picked = candidates.sort(() => Math.random() - 0.5).slice(0, hits);
-  picked.forEach((i) => { stab[i] = 1; });
-  if (Math.random() < 0.55) stab[3] = 1;
+  for (let n = 0; n < hits; n++) {
+    const i = pickWeighted(candidates);
+    if (hit(i, 0.9)) stab[i] = 1;
+  }
+  if (!stab.some((v) => v)) stab[pickWeighted(candidates)] = 1;
 
   const plate = Array(16).fill(0);
-  const plateAt = [2, 7, 10, 11, 15][Math.floor(Math.random() * 5)];
+  const plateAt = pickWeighted([2, 7, 10, 11, 15]);
   plate[plateAt] = 1;
-  if (Math.random() < 0.4) plate[(plateAt + 8) % 16] = 1;
+  if (Math.random() < 0.4) {
+    const extra = pickWeighted([2, 7, 10, 11, 15]);
+    if (hit(extra, 0.8)) plate[extra] = 1;
+  }
 
   state.patterns = { kick, hat, open, snare, perc, bass, stab, plate };
 }
@@ -518,7 +544,6 @@ function onBar() {
     const d = state.drift;
     const w = state.weight;
     const sway = (span) => (Math.random() * 2 - 1) * span;
-    if (d.cutoff) state.cutoff = clamp(state.cutoff + sway(140 * w.cutoff), 220, 1800);
     if (d.feedback) state.feedback = clamp(state.feedback + sway(0.02 * w.feedback), 0.45, 0.75);
     if (d.damp) state.damp = clamp(state.damp + sway(350 * w.damp), 500, 4200);
     if (d.reverb) state.reverb = clamp(state.reverb + sway(0.08 * w.reverb), 0.05, 0.8);
@@ -542,20 +567,20 @@ function mutatePattern() {
   const w = state.weight.pattern;
   const hat = state.patterns.hat;
   if (Math.random() < w) {
-    const i = 1 + Math.floor(Math.random() * 15);
+    const i = pickWeighted([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     hat[i] = hat[i] ? 0 : 1;
   }
   if (Math.random() < 0.4 * w) {
     const open = state.patterns.open;
-    const idx = [2, 6, 10, 14][Math.floor(Math.random() * 4)];
+    const idx = pickWeighted([2, 6, 10, 14]);
     open[idx] = open[idx] ? 0 : 1;
     if (open.reduce((a, b) => a + b, 0) > 3) open[idx] = 0;
   }
   const stab = state.patterns.stab;
   if (Math.random() < 0.5 * w) {
-    const idx = [3, 6, 7, 10, 11, 14][Math.floor(Math.random() * 6)];
+    const idx = pickWeighted([3, 6, 7, 10, 11, 14]);
     stab[idx] = stab[idx] ? 0 : 1;
-    if (stab.reduce((a, b) => a + b, 0) < 2) stab[3] = 1;
+    if (stab.reduce((a, b) => a + b, 0) < 2) stab[pickWeighted([3, 6, 10, 14])] = 1;
     if (stab.reduce((a, b) => a + b, 0) > 4) stab[idx] = 0;
   }
   const kick = state.patterns.kick;
@@ -564,10 +589,10 @@ function mutatePattern() {
   const snare = state.patterns.snare;
   snare[4] = 1;
   snare[12] = 1;
-  if (Math.random() < 0.35 * w) snare[13] = snare[13] ? 0 : 1;
+  if (Math.random() < 0.35 * w * state.stepWeight[13]) snare[13] = snare[13] ? 0 : 1;
   if (Math.random() < 0.45 * w) {
     const plate = state.patterns.plate;
-    const idx = [2, 7, 10, 11, 15][Math.floor(Math.random() * 5)];
+    const idx = pickWeighted([2, 7, 10, 11, 15]);
     plate[idx] = plate[idx] ? 0 : 1;
     if (plate.reduce((a, b) => a + b, 0) > 2) plate[idx] = 0;
     if (plate.reduce((a, b) => a + b, 0) === 0) plate[10] = 1;
@@ -842,7 +867,29 @@ function startRecording() {
   $("record").classList.add("recording");
 }
 
+function glideCutoff() {
+  if (!ctx || !state.playing || !state.autopilot || !state.drift.cutoff || state.weight.cutoff <= 0) return;
+  const now = ctx.currentTime;
+  const dt = Math.min(0.1, Math.max(0.001, now - (state.cutoffStamp || now)));
+  state.cutoffStamp = now;
+  if (now >= state.cutoffRetarget) {
+    const span = 280 + 1700 * state.weight.cutoff;
+    const lo = clamp(state.cutoff - span, 160, 2400);
+    const hi = clamp(state.cutoff + span, 160, 2400);
+    state.cutoffTarget = clamp(lo + Math.random() * Math.max(80, hi - lo), 160, 2400);
+    state.cutoffRetarget = now + 1.2 + Math.random() * (4.5 - state.weight.cutoff * 2);
+  }
+  const rate = 0.45 + state.weight.cutoff * 1.6;
+  state.cutoff += (state.cutoffTarget - state.cutoff) * (1 - Math.exp(-dt * rate));
+  if (now - state.cutoffUi > 0.08) {
+    state.cutoffUi = now;
+    $("cutoff").value = Math.round(state.cutoff);
+    $("cutoffVal").textContent = String(Math.round(state.cutoff));
+  }
+}
+
 function scheduler() {
+  glideCutoff();
   if (!state.playing) return;
   const horizon = ctx.currentTime + 0.12;
   const sixteenth = (60 / state.bpm) / 4;
@@ -1011,6 +1058,22 @@ function syncControls() {
 function wire() {
   seedPattern();
   renderGrids();
+  const stepRoot = $("stepWeights");
+  state.stepWeight.forEach((weight, i) => {
+    const label = document.createElement("label");
+    label.textContent = String(i + 1);
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = "0";
+    input.max = "100";
+    input.step = "1";
+    input.value = String(Math.round(weight * 100));
+    input.addEventListener("input", () => {
+      state.stepWeight[i] = Number(input.value) / 100;
+    });
+    label.appendChild(input);
+    stepRoot.appendChild(label);
+  });
   $("keyName").textContent = chordName();
 
   applyBase($("baseColor").value);
@@ -1050,7 +1113,11 @@ function wire() {
     $("keyName").textContent = chordName();
   });
 
-  bindSlider("cutoff", "cutoffVal", (el) => Number(el.value), (v) => { state.cutoff = v; }, (v) => String(Math.round(v)));
+  bindSlider("cutoff", "cutoffVal", (el) => Number(el.value), (v) => {
+    state.cutoff = v;
+    state.cutoffTarget = v;
+    if (ctx) state.cutoffRetarget = ctx.currentTime + 2;
+  }, (v) => String(Math.round(v)));
   bindSlider("reso", "resoVal", (el) => Number(el.value), (v) => { state.reso = v; }, (v) => v.toFixed(1));
   bindSlider("decay", "decayVal", (el) => Number(el.value), (v) => { state.decay = v / 1000; }, (v) => String(Math.round(v)));
   bindSlider("send", "sendVal", (el) => Number(el.value), (v) => { state.send = v / 100; }, (v) => String(Math.round(v)));
