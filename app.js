@@ -66,6 +66,7 @@ const state = {
     breakdown: 1,
   },
   stepWeight: [1, 0.35, 0.55, 0.3, 0.85, 0.4, 0.6, 0.3, 0.9, 0.35, 0.55, 0.3, 0.85, 0.4, 0.7, 0.3],
+  cutoffGlide: true,
   cutoffTarget: 680,
   cutoffRetarget: 0,
   cutoffStamp: 0,
@@ -658,16 +659,16 @@ function applyBase(hex) {
   const [h, s, l] = rgbToHsl(r, g, b);
   const sat = Math.max(0.35, Math.min(0.85, s || 0.55));
   const accent = [r, g, b];
-  const glow = hslToRgb(h + 28, sat * 0.85, Math.min(0.78, Math.max(0.62, l + 0.18)));
-  const step = hslToRgb(h, sat, Math.min(0.72, Math.max(0.5, l)));
-  const snare = hslToRgb(h + 150, sat * 0.8, 0.55);
-  const kick = hslToRgb(h, 0.18, 0.93);
-  const line = hslToRgb(h + 180, 0.42, 0.22);
-  const ink = hslToRgb(h, 0.28, 0.9);
-  const dim = hslToRgb(h - 18, 0.22, 0.62);
-  const bg = hslToRgb(h, 0.35, 0.04);
-  const panel = hslToRgb(h, 0.32, 0.07);
-  const field = hslToRgb(h + 180, 0.55, 0.07);
+  const glow = hslToRgb(h, Math.min(0.9, sat + 0.1), 0.78);
+  const step = hslToRgb(h, sat, 0.62);
+  const snare = hslToRgb(h, Math.min(1, sat + 0.15), 0.48);
+  const kick = hslToRgb(h, 0.22, 0.94);
+  const line = hslToRgb(h, 0.7, 0.28);
+  const ink = hslToRgb(h, 0.45, 0.86);
+  const dim = hslToRgb(h, 0.35, 0.58);
+  const bg = hslToRgb(h, 0.55, 0.035);
+  const panel = hslToRgb(h, 0.5, 0.07);
+  const field = hslToRgb(h, 0.6, 0.045);
   state.color = { hex, r, g, b };
   state.palette = { field, node: accent, glow };
   const root = document.documentElement.style;
@@ -880,7 +881,8 @@ function glideCutoff() {
     state.cutoffRetarget = now + 1.2 + Math.random() * (4.5 - state.weight.cutoff * 2);
   }
   const rate = 0.45 + state.weight.cutoff * 1.6;
-  state.cutoff += (state.cutoffTarget - state.cutoff) * (1 - Math.exp(-dt * rate));
+  if (state.cutoffGlide) state.cutoff += (state.cutoffTarget - state.cutoff) * (1 - Math.exp(-dt * rate));
+  else state.cutoff = state.cutoffTarget;
   if (now - state.cutoffUi > 0.08) {
     state.cutoffUi = now;
     $("cutoff").value = Math.round(state.cutoff);
@@ -1076,6 +1078,7 @@ function wire() {
   });
   $("keyName").textContent = chordName();
 
+  $("cutoffGlide").addEventListener("change", () => { state.cutoffGlide = $("cutoffGlide").checked; });
   applyBase($("baseColor").value);
   $("baseColor").addEventListener("input", () => applyBase($("baseColor").value));
 

@@ -18,6 +18,9 @@
 <meta name="twitter:title" content="Endless Dub — generative dub techno in the browser">
 <meta name="twitter:description" content="A slow generative dub techno jam in the browser, with a delay and a cymatics plate driven by the mix.">
 <meta name="twitter:image" content="https://xyzzyapps.github.io/endless_dub/preview.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -106,7 +109,7 @@
 
   <section class="panel">
     <h2>Step weight</h2>
-    <p class="hint">One curve for the whole bar. New patterns are more likely to place a hit on a heavier step. Step 1 starts heavy, the offbeats start light.</p>
+    <p class="hint">These weights feed every drum. A heavier step is more likely to receive a kick, hat, snare, rim, or any other hit when a pattern is generated. Step 1 starts heavy and the offbeats start light.</p>
     <div class="knobs faders" id="stepWeights"></div>
   </section>
 
@@ -124,7 +127,9 @@
   <section class="panel">
     <h2>Chord stab</h2>
     <div class="knobs">
-      <label>Cutoff <input id="cutoff" type="range" min="180" max="2400" step="1" value="680"><span id="cutoffVal">680</span></label>
+      <label>Cutoff <input id="cutoff" type="range" min="180" max="2400" step="1" value="680"><span id="cutoffVal">680</span>
+        <span class="subcheck"><input id="cutoffGlide" type="checkbox" checked> Interpolate</span>
+      </label>
       <label>Reso <input id="reso" type="range" min="0" max="18" step="0.1" value="6"><span id="resoVal">6.0</span></label>
       <label>Delay send <input id="send" type="range" min="0" max="100" step="1" value="62"><span id="sendVal">62</span></label>
     </div>
