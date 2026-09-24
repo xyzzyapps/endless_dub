@@ -26,6 +26,19 @@
 <body>
 <canvas id="plate" width="480" height="270"></canvas>
 <button id="showUi" type="button" class="ghost show-ui">Show player</button>
+<section class="panel" id="account">
+  <p id="accountStatus" class="hint">Sign in to save this session and copy a share link.</p>
+  <div class="account-row" id="signedOut">
+    <input id="email" type="email" placeholder="you@email" autocomplete="email">
+    <button id="emailSign" type="button" class="ghost">Email link</button>
+    <button id="googleSign" type="button" class="ghost">Google</button>
+  </div>
+  <div class="account-row" id="signedIn" hidden>
+    <button id="saveSong" type="button">Save</button>
+    <button id="shareSong" type="button" class="ghost">Copy link</button>
+    <button id="signOut" type="button" class="ghost">Sign out</button>
+  </div>
+</section>
 <div class="app">
   <header>
     <div>
@@ -105,21 +118,6 @@
         <label>Vol <input id="plateLvl" type="range" min="0" max="100" step="1" value="0"><span id="plateVal">0</span></label>
         <label>Len <input id="ring" type="range" min="200" max="4200" step="1" value="1800"><span id="ringVal">1800</span></label>
       </div></div>
-    </div>
-  </section>
-
-  <section class="panel" id="account">
-    <h2>Account</h2>
-    <p id="accountStatus" class="hint">Sign in to save this session and copy a share link.</p>
-    <div class="account-row" id="signedOut">
-      <input id="email" type="email" placeholder="you@email" autocomplete="email">
-      <button id="emailSign" type="button" class="ghost">Email link</button>
-      <button id="googleSign" type="button" class="ghost">Google</button>
-    </div>
-    <div class="account-row" id="signedIn" hidden>
-      <button id="saveSong" type="button">Save</button>
-      <button id="shareSong" type="button" class="ghost">Copy link</button>
-      <button id="signOut" type="button" class="ghost">Sign out</button>
     </div>
   </section>
 
