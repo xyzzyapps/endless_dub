@@ -1435,7 +1435,7 @@ function songSnapshot() {
     bassLvl: state.bassLvl,
     drive: state.drive,
     srs: state.srs,
-    color: state.color.hex,
+    color: ($("baseColor") && $("baseColor").value) || state.color.hex,
     lvl: state.lvl,
     len: state.len,
     plate: state.plate,
@@ -1512,7 +1512,7 @@ function applySnapshot(raw) {
   $("autopilot").checked = !!state.autopilot;
   $("cutoffGlide").checked = !!state.cutoffGlide;
   $("baseColor").value = data.color;
-  applyBase(data.color);
+  $("baseColor").dispatchEvent(new Event("input", { bubbles: true }));
   const driftIds = {
     cutoff: "driftCutoff", feedback: "driftFeedback", damp: "driftDamp", reverb: "driftReverb",
     decay: "driftDecay", pattern: "driftPattern", chord: "driftChord", breakdown: "driftBreak",
