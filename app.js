@@ -202,14 +202,39 @@ function renderGrids() {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "step " + row.cls + (on ? " on" : "") + (i % 4 === 0 ? " downbeat" : "");
-      b.addEventListener("click", () => {
-        state.patterns[row.id][i] = state.patterns[row.id][i] ? 0 : 1;
-        b.classList.toggle("on");
+      b.style.setProperty("--step-w", String(state.stepWeight[i]));
+      let drag = null;
+      b.addEventListener("pointerdown", (e) => {
+        drag = { y: e.clientY, moved: false, w: state.stepWeight[i] };
+        b.setPointerCapture(e.pointerId);
+      });
+      b.addEventListener("pointermove", (e) => {
+        if (!drag) return;
+        const dy = drag.y - e.clientY;
+        if (Math.abs(dy) > 4) drag.moved = true;
+        if (!drag.moved) return;
+        state.stepWeight[i] = clamp(drag.w + dy / 110, 0, 1);
+        paintWeights();
+      });
+      b.addEventListener("pointerup", () => {
+        if (drag && !drag.moved) {
+          state.patterns[row.id][i] = state.patterns[row.id][i] ? 0 : 1;
+          b.classList.toggle("on");
+        }
+        drag = null;
       });
       steps.appendChild(b);
     });
     el.append(title, steps);
     root.appendChild(el);
+  });
+}
+
+function paintWeights() {
+  document.querySelectorAll(".row").forEach((rowEl) => {
+    rowEl.querySelectorAll(".step").forEach((step, i) => {
+      step.style.setProperty("--step-w", state.stepWeight[i].toFixed(3));
+    });
   });
 }
 
@@ -219,6 +244,7 @@ function paintGrids() {
     const id = ROWS[r].id;
     rowEl.querySelectorAll(".step").forEach((step, i) => {
       step.classList.toggle("on", !!state.patterns[id][i]);
+      step.style.setProperty("--step-w", state.stepWeight[i].toFixed(3));
     });
   });
 }
@@ -1060,22 +1086,6 @@ function syncControls() {
 function wire() {
   seedPattern();
   renderGrids();
-  const stepRoot = $("stepWeights");
-  state.stepWeight.forEach((weight, i) => {
-    const label = document.createElement("label");
-    label.textContent = String(i + 1);
-    const input = document.createElement("input");
-    input.type = "range";
-    input.min = "0";
-    input.max = "100";
-    input.step = "1";
-    input.value = String(Math.round(weight * 100));
-    input.addEventListener("input", () => {
-      state.stepWeight[i] = Number(input.value) / 100;
-    });
-    label.appendChild(input);
-    stepRoot.appendChild(label);
-  });
   $("keyName").textContent = chordName();
 
   $("cutoffGlide").addEventListener("change", () => { state.cutoffGlide = $("cutoffGlide").checked; });

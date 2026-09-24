@@ -220,20 +220,23 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 
 .steps { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; }
 
+.step-hint { margin: 0 0 8px; }
+
 .step {
   height: 22px;
   border-radius: 0;
   border: 1px solid #0a2744;
-  background: #01070f;
+  background: color-mix(in srgb, var(--accent) calc(6% + var(--step-w, 0.4) * 48%), #01070f);
   cursor: pointer;
   padding: 0;
-  touch-action: manipulation;
+  touch-action: none;
 }
 
 .step.on {
   background: var(--on);
   border-color: var(--glow);
-  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.85);
+  filter: brightness(calc(0.4 + var(--step-w, 1) * 0.75));
+  box-shadow: 0 0 calc(2px + var(--step-w, 1) * 10px) rgba(var(--accent-rgb), calc(0.15 + var(--step-w, 1) * 0.75));
 }
 .step.kick.on { background: var(--kick); }
 .step.chord.on { background: var(--glow); }
