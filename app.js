@@ -1133,6 +1133,7 @@ function wire() {
   $("chord").addEventListener("click", () => shiftChord());
   $("clear").addEventListener("click", () => {
     ROWS.forEach((row) => {
+      if (row.id === "plate") return;
       state.patterns[row.id] = Array(16).fill(0);
       state.stepWeight[row.id] = Array(16).fill(0);
     });
