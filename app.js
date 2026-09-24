@@ -41,6 +41,7 @@ const state = {
   reverb: 0.34,
   bassLvl: 0.78,
   drive: 0.22,
+  srs: 0.68,
   color: { hex: "#3ec2ff", r: 62, g: 194, b: 255 },
   lvl: { kick: 1, hat: 1, open: 0.85, snare: 1, rim: 1, stab: 1, plate: 0 },
   len: { kick: 0.42, hat: 0.03, open: 0.22, snare: 0.14, rim: 0.07, bass: 0.55 },
@@ -77,7 +78,7 @@ const $ = (id) => document.getElementById(id);
 
 let ctx, master, drumBus, musicBus, duck, delaySend, reverbSend;
 let delayL, delayR, fbL, fbR, dampL, dampR;
-let comp, shaper, analyser;
+let comp, shaper, analyser, srsSide;
 let noiseBuf;
 let timer;
 let recorder = null;
@@ -454,7 +455,7 @@ function buildGraph() {
   duck.connect(shaper);
   shaper.connect(comp);
   comp.connect(analyser);
-  analyser.connect(master);
+  srsSide = buildSrs(analyser, master);
   master.connect(ctx.destination);
 
   // Ping-pong delay with a lowpass in the feedback loop.
@@ -508,6 +509,48 @@ function buildReverb() {
   state._reverbGain = g;
 }
 
+function buildSrs(input, output) {
+  const split = ctx.createChannelSplitter(2);
+  const merge = ctx.createChannelMerger(2);
+  const midL = ctx.createGain();
+  const midR = ctx.createGain();
+  const sideL = ctx.createGain();
+  const sideR = ctx.createGain();
+  midL.gain.value = 0.5;
+  midR.gain.value = 0.5;
+  sideL.gain.value = 0.5;
+  sideR.gain.value = -0.5;
+  const highpass = ctx.createBiquadFilter();
+  highpass.type = "highpass";
+  highpass.frequency.value = 220;
+  highpass.Q.value = 0.7;
+  const shelf = ctx.createBiquadFilter();
+  shelf.type = "highshelf";
+  shelf.frequency.value = 4200;
+  shelf.gain.value = 3.5;
+  const side = ctx.createGain();
+  const sideInv = ctx.createGain();
+  sideInv.gain.value = -1;
+  input.connect(split);
+  split.connect(midL, 0);
+  split.connect(midR, 1);
+  split.connect(sideL, 0);
+  split.connect(sideR, 1);
+  midL.connect(merge, 0, 0);
+  midR.connect(merge, 0, 0);
+  midL.connect(merge, 0, 1);
+  midR.connect(merge, 0, 1);
+  sideL.connect(highpass);
+  sideR.connect(highpass);
+  highpass.connect(shelf);
+  shelf.connect(side);
+  side.connect(merge, 0, 0);
+  side.connect(sideInv);
+  sideInv.connect(merge, 0, 1);
+  merge.connect(output);
+  return side;
+}
+
 function applyParams() {
   if (!ctx) return;
   const beat = 60 / state.bpm;
@@ -528,6 +571,7 @@ function applyParams() {
     curve[i] = Math.tanh(x * amt) / Math.tanh(amt);
   }
   shaper.curve = curve;
+  if (srsSide) srsSide.gain.setTargetAtTime(state.srs * 2.2, ctx.currentTime, 0.05);
 }
 
 function playPlate(t) {
@@ -1202,6 +1246,7 @@ function wire() {
     });
   });
   bindSlider("drive", "driveVal", (el) => Number(el.value), (v) => { state.drive = v / 100; }, (v) => String(Math.round(v)));
+  bindSlider("srs", "srsVal", (el) => Number(el.value), (v) => { state.srs = v / 100; }, (v) => String(Math.round(v)));
   $("div").addEventListener("change", () => {
     state.delayBeats = Number($("div").value);
     applyParams();
