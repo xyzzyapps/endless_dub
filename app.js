@@ -756,7 +756,7 @@ function applyBase(hex) {
   const snare = hslToRgb(h, grey ? 0 : Math.min(1, sat + 0.15), 0.48);
   const kick = hslToRgb(h, grey ? 0 : 0.22, 0.94);
   const line = hslToRgb(h, grey ? 0 : 0.7, 0.28);
-  const ink = hslToRgb(h, grey ? 0 : 0.45, 0.86);
+  const ink = grey ? [r, g, b] : hslToRgb(h, 0.45, 0.86);
   const dim = hslToRgb(h, grey ? 0 : 0.35, 0.58);
   const bg = hslToRgb(h, grey ? 0 : 0.55, 0.035);
   const panel = hslToRgb(h, grey ? 0 : 0.5, 0.07);
@@ -846,7 +846,7 @@ function startVideo() {
   recordCanvas.height = 720;
   recordCanvas.width = Math.max(720, Math.min(1280, Math.round(720 * aspect)));
   recordCtx = recordCanvas.getContext("2d", { alpha: false });
-  recordCtx.fillStyle = "#01070f";
+  recordCtx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#000";
   recordCtx.fillRect(0, 0, recordCanvas.width, recordCanvas.height);
   const plateStream = recordCanvas.captureStream(25);
   recordDest = ctx.createMediaStreamDestination();
@@ -1103,7 +1103,7 @@ function draw(now) {
   const c = canvas.getContext("2d");
   const w = canvas.width;
   const h = canvas.height;
-  c.fillStyle = "#01070f";
+  c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#000";
   c.fillRect(0, 0, w, h);
   if (!analyser) {
     c.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "#0c3a66";
