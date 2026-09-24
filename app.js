@@ -1322,6 +1322,208 @@ function wire() {
   });
 
   draw();
+  setupAccount();
+}
+
+const supabase = window.supabase.createClient(
+  "https://dddjxltlbhxgfxcnczvh.supabase.co",
+  "sb_publishable_aDHg7fY5PRHLad4ctOcOKA_M71z58XD"
+);
+
+let songId = new URLSearchParams(location.search).get("song");
+
+function siteUrl() {
+  return location.origin + location.pathname;
+}
+
+function songSnapshot() {
+  return {
+    patterns: state.patterns,
+    stepWeight: state.stepWeight,
+    bpm: state.bpm,
+    swing: state.swing,
+    root: state.root,
+    degree: state.degree,
+    delayBeats: state.delayBeats,
+    feedback: state.feedback,
+    damp: state.damp,
+    cutoff: state.cutoff,
+    reso: state.reso,
+    decay: state.decay,
+    send: state.send,
+    reverb: state.reverb,
+    bassLvl: state.bassLvl,
+    drive: state.drive,
+    srs: state.srs,
+    color: state.color.hex,
+    lvl: state.lvl,
+    len: state.len,
+    plate: state.plate,
+    drift: state.drift,
+    weight: state.weight,
+    autopilot: state.autopilot,
+    cutoffGlide: state.cutoffGlide,
+  };
+}
+
+function applySnapshot(data) {
+  const set = (id, value) => {
+    const el = $(id);
+    if (!el) return;
+    el.value = value;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  Object.assign(state, {
+    patterns: data.patterns,
+    stepWeight: data.stepWeight,
+    bpm: data.bpm,
+    swing: data.swing,
+    root: data.root,
+    degree: data.degree,
+    delayBeats: data.delayBeats,
+    feedback: data.feedback,
+    damp: data.damp,
+    cutoff: data.cutoff,
+    cutoffTarget: data.cutoff,
+    reso: data.reso,
+    decay: data.decay,
+    send: data.send,
+    reverb: data.reverb,
+    bassLvl: data.bassLvl,
+    drive: data.drive,
+    srs: data.srs,
+    lvl: data.lvl,
+    len: data.len,
+    plate: data.plate,
+    drift: data.drift,
+    weight: data.weight,
+    autopilot: data.autopilot,
+    cutoffGlide: data.cutoffGlide,
+  });
+  set("bpm", state.bpm);
+  set("swing", Math.round(state.swing * 100));
+  set("cutoff", Math.round(state.cutoff));
+  set("reso", state.reso);
+  set("decay", Math.round(state.decay * 1000));
+  set("send", Math.round(state.send * 100));
+  set("feedback", Math.round(state.feedback * 100));
+  set("damp", Math.round(state.damp));
+  set("reverb", Math.round(state.reverb * 100));
+  set("bassLvl", Math.round(state.bassLvl * 100));
+  set("drive", Math.round(state.drive * 100));
+  set("srs", Math.round(state.srs * 100));
+  set("tension", Math.round(state.plate.tension * 100));
+  set("ring", Math.round(state.plate.ring * 1000));
+  set("order", state.plate.order);
+  ["kick", "hat", "open", "snare", "rim", "stab", "plate"].forEach((id) => {
+    const levelId = id === "stab" ? "stabLvl" : id === "rim" ? "rimLvl" : id === "plate" ? "plateLvl" : id + "Lvl";
+    const lenId = id === "stab" ? "decay" : id === "bass" ? "bassLen" : id === "plate" ? "ring" : id + "Len";
+    if (id !== "stab" && id !== "plate") set(levelId, Math.round(state.lvl[id] * 100));
+    if (id === "stab") set("stabLvl", Math.round(state.lvl.stab * 100));
+    if (id === "plate") set("plateLvl", Math.round(state.lvl.plate * 100));
+    if (lenId !== "decay" && lenId !== "ring" && state.len[id] != null) set(lenId, Math.round(state.len[id] * 1000));
+  });
+  $("root").value = String(((state.root % 12) + 12) % 12);
+  $("root").dispatchEvent(new Event("change", { bubbles: true }));
+  state.degree = data.degree;
+  $("div").value = String(state.delayBeats);
+  $("div").dispatchEvent(new Event("change", { bubbles: true }));
+  $("autopilot").checked = !!state.autopilot;
+  $("cutoffGlide").checked = !!state.cutoffGlide;
+  $("baseColor").value = data.color;
+  applyBase(data.color);
+  const driftIds = {
+    cutoff: "driftCutoff", feedback: "driftFeedback", damp: "driftDamp", reverb: "driftReverb",
+    decay: "driftDecay", pattern: "driftPattern", chord: "driftChord", breakdown: "driftBreak",
+    send: "driftSend", width: "driftWidth", reso: "driftReso", swing: "driftSwing",
+  };
+  Object.entries(driftIds).forEach(([key, id]) => { $(id).checked = !!state.drift[key]; });
+  const weightIds = {
+    cutoff: "wCutoff", feedback: "wFeedback", damp: "wDamp", reverb: "wReverb",
+    decay: "wDecay", pattern: "wPattern", chord: "wChord", breakdown: "wBreak",
+    send: "wSend", width: "wWidth", reso: "wReso", swing: "wSwing",
+  };
+  Object.entries(weightIds).forEach(([key, id]) => {
+    $(id).value = Math.round(state.weight[key] * 100);
+    $(id + "Val").textContent = $(id).value;
+  });
+  paintGrids();
+  syncControls();
+  if (ctx) applyParams();
+}
+
+function showSession(session) {
+  const signedIn = !!session;
+  $("signedOut").hidden = signedIn;
+  $("signedIn").hidden = !signedIn;
+  if (signedIn) $("accountStatus").textContent = session.user.email || "Signed in";
+  else if (!songId) $("accountStatus").textContent = "Sign in to save this session and copy a share link.";
+}
+
+async function loadSong(id) {
+  const { data, error } = await supabase.from("songs").select("data, title").eq("id", id).maybeSingle();
+  if (error || !data) {
+    $("accountStatus").textContent = error ? error.message : "That song link was not found.";
+    return;
+  }
+  applySnapshot(data.data);
+  $("accountStatus").textContent = "Loaded " + (data.title || "song") + ".";
+}
+
+async function setupAccount() {
+  const { data } = await supabase.auth.getSession();
+  showSession(data.session);
+  supabase.auth.onAuthStateChange((_event, session) => showSession(session));
+  $("emailSign").addEventListener("click", async () => {
+    const email = $("email").value.trim();
+    if (!email) return;
+    $("accountStatus").textContent = "Sending a sign-in link…";
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: siteUrl() },
+    });
+    $("accountStatus").textContent = error ? error.message : "Check your email for the sign-in link.";
+  });
+  $("googleSign").addEventListener("click", async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: siteUrl() },
+    });
+    if (error) $("accountStatus").textContent = error.message;
+  });
+  $("signOut").addEventListener("click", () => supabase.auth.signOut());
+  $("saveSong").addEventListener("click", async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user) return;
+    const row = { owner: user.id, title: chordName(), data: songSnapshot() };
+    $("accountStatus").textContent = "Saving…";
+    if (songId) {
+      const updated = await supabase.from("songs").update({ title: row.title, data: row.data }).eq("id", songId).eq("owner", user.id).select("id");
+      if (!updated.error && updated.data && updated.data.length) {
+        $("accountStatus").textContent = "Saved.";
+        return;
+      }
+    }
+    const inserted = await supabase.from("songs").insert(row).select("id").single();
+    if (inserted.error) {
+      $("accountStatus").textContent = inserted.error.message;
+      return;
+    }
+    songId = inserted.data.id;
+    history.replaceState(null, "", siteUrl() + "?song=" + songId);
+    $("accountStatus").textContent = "Saved. Copy link to share it.";
+  });
+  $("shareSong").addEventListener("click", async () => {
+    if (!songId) {
+      $("accountStatus").textContent = "Save first, then copy the link.";
+      return;
+    }
+    const link = siteUrl() + "?song=" + songId;
+    await navigator.clipboard.writeText(link);
+    $("accountStatus").textContent = "Link copied.";
+  });
+  if (songId) await loadSong(songId);
 }
 
 wire();

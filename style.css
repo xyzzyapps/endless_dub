@@ -254,6 +254,16 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 
 .step-hint { margin: 0 0 8px; }
 
+.account-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#email {
+  font: inherit;
+  color: var(--ink);
+  background: #01070f;
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  min-width: 16em;
+}
+
 .step {
   --step-fill: var(--accent);
   height: 28px;

@@ -108,6 +108,21 @@
     </div>
   </section>
 
+  <section class="panel" id="account">
+    <h2>Account</h2>
+    <p id="accountStatus" class="hint">Sign in to save this session and copy a share link.</p>
+    <div class="account-row" id="signedOut">
+      <input id="email" type="email" placeholder="you@email" autocomplete="email">
+      <button id="emailSign" type="button" class="ghost">Email link</button>
+      <button id="googleSign" type="button" class="ghost">Google</button>
+    </div>
+    <div class="account-row" id="signedIn" hidden>
+      <button id="saveSong" type="button">Save</button>
+      <button id="shareSong" type="button" class="ghost">Copy link</button>
+      <button id="signOut" type="button" class="ghost">Sign out</button>
+    </div>
+  </section>
+
   <p class="hint step-hint">Each step has its own weight, shown as brightness. Drag that step up or down to change it. A click toggles the hit. Brighter steps are more likely to be chosen when that drum's pattern is generated.</p>
   <section class="grids" id="grids"></section>
 
@@ -182,6 +197,7 @@
     <p>Required Notice: Copyright 2026 Xyzzy Apps. <a href="https://polyformproject.org/licenses/noncommercial/1.0.0">PolyForm Noncommercial 1.0.0</a>.</p>
   </footer>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>
 </html>
