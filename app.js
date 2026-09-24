@@ -54,7 +54,11 @@ const state = {
     decay: false,
     pattern: true,
     chord: true,
-    breakdown: false,
+    breakdown: true,
+    send: false,
+    width: false,
+    reso: false,
+    swing: true,
   },
   weight: {
     cutoff: 1,
@@ -65,6 +69,10 @@ const state = {
     pattern: 1,
     chord: 1,
     breakdown: 1,
+    send: 1,
+    width: 1,
+    reso: 1,
+    swing: 1,
   },
   stepWeight: {},
   cutoffGlide: true,
@@ -628,6 +636,10 @@ function onBar() {
     if (d.damp) state.damp = clamp(state.damp + sway(350 * w.damp), 500, 4200);
     if (d.reverb) state.reverb = clamp(state.reverb + sway(0.08 * w.reverb), 0.05, 0.8);
     if (d.decay) state.decay = clamp(state.decay + sway(0.08 * w.decay), 0.09, 0.8);
+    if (d.send) state.send = clamp(state.send + sway(0.06 * w.send), 0.15, 0.9);
+    if (d.width) state.srs = clamp(state.srs + sway(0.08 * w.width), 0.15, 0.9);
+    if (d.reso) state.reso = clamp(state.reso + sway(2.5 * w.reso), 0, 14);
+    if (d.swing) state.swing = clamp(state.swing + sway(0.04 * w.swing), 0, 0.4);
     syncControls();
     applyParams();
   }
@@ -1133,6 +1145,14 @@ function syncControls() {
   $("reverbVal").textContent = Math.round(state.reverb * 100);
   $("decay").value = Math.round(state.decay * 1000);
   $("decayVal").textContent = Math.round(state.decay * 1000);
+  $("send").value = Math.round(state.send * 100);
+  $("sendVal").textContent = Math.round(state.send * 100);
+  $("srs").value = Math.round(state.srs * 100);
+  $("srsVal").textContent = Math.round(state.srs * 100);
+  $("reso").value = state.reso.toFixed(1);
+  $("resoVal").textContent = state.reso.toFixed(1);
+  $("swing").value = Math.round(state.swing * 100);
+  $("swingVal").textContent = Math.round(state.swing * 100);
   $("keyName").textContent = chordName();
 }
 
@@ -1225,6 +1245,10 @@ function wire() {
     driftPattern: "pattern",
     driftChord: "chord",
     driftBreak: "breakdown",
+    driftSend: "send",
+    driftWidth: "width",
+    driftReso: "reso",
+    driftSwing: "swing",
   };
   Object.entries(driftMap).forEach(([id, key]) => {
     $(id).addEventListener("change", () => { state.drift[key] = $(id).checked; });
@@ -1238,6 +1262,10 @@ function wire() {
     wPattern: "pattern",
     wChord: "chord",
     wBreak: "breakdown",
+    wSend: "send",
+    wWidth: "width",
+    wReso: "reso",
+    wSwing: "swing",
   };
   Object.entries(weightMap).forEach(([id, key]) => {
     $(id).addEventListener("input", () => {
