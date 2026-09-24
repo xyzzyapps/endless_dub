@@ -584,21 +584,79 @@ function shiftChord() {
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
+function rgbToHsl(r, g, b) {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === rn) h = (gn - bn) / d + (gn < bn ? 6 : 0);
+  else if (max === gn) h = (bn - rn) / d + 2;
+  else h = (rn - gn) / d + 4;
+  return [h * 60, s, l];
+}
+
+function hslToRgb(h, s, l) {
+  const hue = ((h % 360) + 360) % 360 / 360;
+  if (s === 0) {
+    const v = Math.round(l * 255);
+    return [v, v, v];
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const channel = (t) => {
+    let x = t;
+    if (x < 0) x += 1;
+    if (x > 1) x -= 1;
+    if (x < 1 / 6) return p + (q - p) * 6 * x;
+    if (x < 1 / 2) return q;
+    if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
+    return p;
+  };
+  return [channel(hue + 1 / 3), channel(hue), channel(hue - 1 / 3)].map((v) => Math.round(v * 255));
+}
+
+function rgbHex(rgb) {
+  return "#" + rgb.map((v) => v.toString(16).padStart(2, "0")).join("");
+}
+
 function applyBase(hex) {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 255;
   const g = (n >> 8) & 255;
   const b = n & 255;
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const sat = Math.max(0.35, Math.min(0.85, s || 0.55));
+  const accent = [r, g, b];
+  const glow = hslToRgb(h + 28, sat * 0.85, Math.min(0.78, Math.max(0.62, l + 0.18)));
+  const step = hslToRgb(h, sat, Math.min(0.72, Math.max(0.5, l)));
+  const snare = hslToRgb(h + 150, sat * 0.8, 0.55);
+  const kick = hslToRgb(h, 0.18, 0.93);
+  const line = hslToRgb(h + 180, 0.42, 0.22);
+  const ink = hslToRgb(h, 0.28, 0.9);
+  const dim = hslToRgb(h - 18, 0.22, 0.62);
+  const bg = hslToRgb(h, 0.35, 0.04);
+  const panel = hslToRgb(h, 0.32, 0.07);
+  const field = hslToRgb(h + 180, 0.55, 0.07);
   state.color = { hex, r, g, b };
-  const mix = (t, target) => Math.round(r + (target - r) * t).toString(16).padStart(2, "0")
-    + Math.round(g + (target - g) * t).toString(16).padStart(2, "0")
-    + Math.round(b + (target - b) * t).toString(16).padStart(2, "0");
+  state.palette = { field, node: accent, glow };
   const root = document.documentElement.style;
   root.setProperty("--accent", hex);
-  root.setProperty("--on", hex);
+  root.setProperty("--on", rgbHex(step));
   root.setProperty("--accent-rgb", r + ", " + g + ", " + b);
-  root.setProperty("--glow", "#" + mix(0.45, 255));
-  root.setProperty("--line", "#" + mix(0.72, 0));
+  root.setProperty("--glow", rgbHex(glow));
+  root.setProperty("--line", rgbHex(line));
+  root.setProperty("--kick", rgbHex(kick));
+  root.setProperty("--snare", rgbHex(snare));
+  root.setProperty("--ink", rgbHex(ink));
+  root.setProperty("--dim", rgbHex(dim));
+  root.setProperty("--bg", rgbHex(bg));
+  root.setProperty("--panel", rgbHex(panel));
 }
 
 function writeAscii(view, offset, text) {
@@ -874,10 +932,13 @@ function drawPlate(now) {
       }
       const sand = Math.pow(1 - Math.min(1, Math.abs(z) * 1.7), 3) * (0.25 + plateEnergy);
       const p = (y * w + x) * 4;
-      const col = state.color;
-      data[p] = 4 + sand * col.r;
-      data[p + 1] = 8 + sand * col.g;
-      data[p + 2] = 12 + sand * col.b;
+      const pal = state.palette;
+      const nodeR = pal.node[0] * 0.72 + pal.glow[0] * 0.28;
+      const nodeG = pal.node[1] * 0.72 + pal.glow[1] * 0.28;
+      const nodeB = pal.node[2] * 0.72 + pal.glow[2] * 0.28;
+      data[p] = pal.field[0] + sand * (nodeR - pal.field[0]);
+      data[p + 1] = pal.field[1] + sand * (nodeG - pal.field[1]);
+      data[p + 2] = pal.field[2] + sand * (nodeB - pal.field[2]);
       data[p + 3] = 255;
     }
   }
@@ -901,7 +962,7 @@ function draw(now) {
   c.fillStyle = "#01070f";
   c.fillRect(0, 0, w, h);
   if (!analyser) {
-    c.strokeStyle = `rgb(${Math.round(state.color.r * 0.28)}, ${Math.round(state.color.g * 0.28)}, ${Math.round(state.color.b * 0.28)})`;
+    c.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "#0c3a66";
     c.beginPath();
     c.moveTo(0, h / 2);
     c.lineTo(w, h / 2);
@@ -952,6 +1013,7 @@ function wire() {
   renderGrids();
   $("keyName").textContent = chordName();
 
+  applyBase($("baseColor").value);
   $("baseColor").addEventListener("input", () => applyBase($("baseColor").value));
 
   $("play").addEventListener("click", async () => {
