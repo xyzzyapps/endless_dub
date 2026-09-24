@@ -28,14 +28,16 @@
 <canvas id="plate" width="480" height="270"></canvas>
 <button id="showUi" type="button" class="ghost show-ui">Show player</button>
 <section class="panel" id="account">
-  <p id="accountStatus" class="hint">Sign in to save this session and copy a share link.</p>
+  <p id="accountStatus" class="hint"></p>
   <div class="account-row" id="signedOut">
-    <input id="email" type="email" placeholder="you@email" autocomplete="email">
-    <button id="emailSign" type="button" class="ghost">Email link</button>
+    <input id="email" type="email" placeholder="Email" autocomplete="email">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="signIn" type="button">Sign in</button>
+    <button id="signUp" type="button" class="ghost">Sign up</button>
   </div>
   <div class="account-row" id="signedIn" hidden>
     <button id="saveSong" type="button">Save</button>
-    <button id="shareSong" type="button" class="ghost">Copy link</button>
+    <button id="shareSong" type="button" class="ghost">Share</button>
     <button id="signOut" type="button" class="ghost">Sign out</button>
   </div>
 </section>

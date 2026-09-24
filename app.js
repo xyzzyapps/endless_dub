@@ -1538,7 +1538,7 @@ function showSession(session) {
   $("signedOut").hidden = signedIn;
   $("signedIn").hidden = !signedIn;
   if (signedIn) $("accountStatus").textContent = session.user.email || "Signed in";
-  else if (!songId) $("accountStatus").textContent = "Sign in to save this session and copy a share link.";
+  else $("accountStatus").textContent = "";
 }
 
 async function loadSong(id) {
@@ -1555,16 +1555,24 @@ async function setupAccount() {
   const { data } = await cloud.auth.getSession();
   showSession(data.session);
   cloud.auth.onAuthStateChange((_event, session) => showSession(session));
-  $("emailSign").addEventListener("click", async () => {
+  async function withPassword(signUp) {
     const email = $("email").value.trim();
-    if (!email) return;
-    $("accountStatus").textContent = "Sending a sign-in link…";
-    const { error } = await cloud.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: siteUrl() },
-    });
-    $("accountStatus").textContent = error ? error.message : "Check your email for the sign-in link.";
-  });
+    const password = $("password").value;
+    if (!email || !password) {
+      $("accountStatus").textContent = "Enter an email and a password.";
+      return;
+    }
+    const result = signUp
+      ? await cloud.auth.signUp({ email, password, options: { emailRedirectTo: siteUrl() } })
+      : await cloud.auth.signInWithPassword({ email, password });
+    if (result.error) {
+      $("accountStatus").textContent = result.error.message;
+      return;
+    }
+    if (signUp && !result.data.session) $("accountStatus").textContent = "Check your email to confirm the account.";
+  }
+  $("signIn").addEventListener("click", () => withPassword(false));
+  $("signUp").addEventListener("click", () => withPassword(true));
   $("signOut").addEventListener("click", () => cloud.auth.signOut());
   $("saveSong").addEventListener("click", async () => {
     const { data: userData } = await cloud.auth.getUser();
@@ -1594,7 +1602,7 @@ async function setupAccount() {
   });
   $("shareSong").addEventListener("click", async () => {
     if (!songId) {
-      $("accountStatus").textContent = "Save first, then copy the link.";
+      $("accountStatus").textContent = "Save first, then share.";
       return;
     }
     const link = siteUrl() + "?song=" + songId;

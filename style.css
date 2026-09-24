@@ -274,13 +274,13 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 }
 #account .hint { margin: 0; }
 .account-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-#email {
+#email, #password {
   font: inherit;
   color: var(--ink);
   background: #01070f;
   border: 1px solid var(--line);
   padding: 6px 8px;
-  min-width: 12em;
+  min-width: 10em;
 }
 
 .step {
@@ -413,7 +413,7 @@ body.plate-only .show-ui { display: inline-block; }
   .row { grid-template-columns: 1fr; }
   input[type="range"] { width: 100%; }
   .fader input[type="range"] { width: 128px; }
-  button, select, #email { font-size: 16px; min-height: 44px; }
+  button, select, #email, #password { font-size: 16px; min-height: 44px; }
   .step { height: 44px; }
   .pairs { justify-content: space-between; }
   #account {
@@ -423,7 +423,7 @@ body.plate-only .show-ui { display: inline-block; }
     padding-right: calc(12px + env(safe-area-inset-right));
   }
   #accountStatus { overflow-wrap: anywhere; }
-  #email { width: 100%; min-width: 0; box-sizing: border-box; }
+  #email, #password { width: 100%; min-width: 0; box-sizing: border-box; }
   .account-row { width: 100%; }
   .account-row button { flex: 1; }
   .app { padding-top: calc(210px + env(safe-area-inset-top)); }
