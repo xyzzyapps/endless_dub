@@ -1326,7 +1326,7 @@ function wire() {
 }
 
 const cloud = window.supabase.createClient(
-  "https://dddjxltlbhxgfxcnczvh.cloud.co",
+  "https://dddjxltlbhxgfxcnczvh.supabase.co",
   "sb_publishable_aDHg7fY5PRHLad4ctOcOKA_M71z58XD"
 );
 
