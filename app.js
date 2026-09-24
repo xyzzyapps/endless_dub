@@ -1325,8 +1325,8 @@ function wire() {
   setupAccount();
 }
 
-const supabase = window.supabase.createClient(
-  "https://dddjxltlbhxgfxcnczvh.supabase.co",
+const cloud = window.supabase.createClient(
+  "https://dddjxltlbhxgfxcnczvh.cloud.co",
   "sb_publishable_aDHg7fY5PRHLad4ctOcOKA_M71z58XD"
 );
 
@@ -1461,7 +1461,7 @@ function showSession(session) {
 }
 
 async function loadSong(id) {
-  const { data, error } = await supabase.from("songs").select("data, title").eq("id", id).maybeSingle();
+  const { data, error } = await cloud.from("songs").select("data, title").eq("id", id).maybeSingle();
   if (error || !data) {
     $("accountStatus").textContent = error ? error.message : "That song link was not found.";
     return;
@@ -1471,41 +1471,41 @@ async function loadSong(id) {
 }
 
 async function setupAccount() {
-  const { data } = await supabase.auth.getSession();
+  const { data } = await cloud.auth.getSession();
   showSession(data.session);
-  supabase.auth.onAuthStateChange((_event, session) => showSession(session));
+  cloud.auth.onAuthStateChange((_event, session) => showSession(session));
   $("emailSign").addEventListener("click", async () => {
     const email = $("email").value.trim();
     if (!email) return;
     $("accountStatus").textContent = "Sending a sign-in link…";
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await cloud.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: siteUrl() },
     });
     $("accountStatus").textContent = error ? error.message : "Check your email for the sign-in link.";
   });
   $("googleSign").addEventListener("click", async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { error } = await cloud.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: siteUrl() },
     });
     if (error) $("accountStatus").textContent = error.message;
   });
-  $("signOut").addEventListener("click", () => supabase.auth.signOut());
+  $("signOut").addEventListener("click", () => cloud.auth.signOut());
   $("saveSong").addEventListener("click", async () => {
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await cloud.auth.getUser();
     const user = userData.user;
     if (!user) return;
     const row = { owner: user.id, title: chordName(), data: songSnapshot() };
     $("accountStatus").textContent = "Saving…";
     if (songId) {
-      const updated = await supabase.from("songs").update({ title: row.title, data: row.data }).eq("id", songId).eq("owner", user.id).select("id");
+      const updated = await cloud.from("songs").update({ title: row.title, data: row.data }).eq("id", songId).eq("owner", user.id).select("id");
       if (!updated.error && updated.data && updated.data.length) {
         $("accountStatus").textContent = "Saved.";
         return;
       }
     }
-    const inserted = await supabase.from("songs").insert(row).select("id").single();
+    const inserted = await cloud.from("songs").insert(row).select("id").single();
     if (inserted.error) {
       $("accountStatus").textContent = inserted.error.message;
       return;
