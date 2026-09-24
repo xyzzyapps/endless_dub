@@ -774,6 +774,9 @@ function applyBase(hex) {
   root.setProperty("--dim", rgbHex(dim));
   root.setProperty("--bg", rgbHex(bg));
   root.setProperty("--panel", rgbHex(panel));
+  document.querySelectorAll(".swatch").forEach((btn) => {
+    btn.classList.toggle("on", btn.dataset.color.toLowerCase() === hex.toLowerCase());
+  });
 }
 
 function writeAscii(view, offset, text) {
@@ -1165,6 +1168,12 @@ function wire() {
   $("cutoffGlide").addEventListener("change", () => { state.cutoffGlide = $("cutoffGlide").checked; });
   applyBase($("baseColor").value);
   $("baseColor").addEventListener("input", () => applyBase($("baseColor").value));
+  document.querySelectorAll(".swatch").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      $("baseColor").value = btn.dataset.color;
+      $("baseColor").dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  });
 
   $("play").addEventListener("click", async () => {
     if (!ctx) buildGraph();
@@ -1439,10 +1448,23 @@ function songSnapshot() {
     lvl: state.lvl,
     len: state.len,
     plate: state.plate,
-    drift: state.drift,
+    drift: {
+      cutoff: $("driftCutoff").checked,
+      feedback: $("driftFeedback").checked,
+      damp: $("driftDamp").checked,
+      reverb: $("driftReverb").checked,
+      decay: $("driftDecay").checked,
+      pattern: $("driftPattern").checked,
+      chord: $("driftChord").checked,
+      breakdown: $("driftBreak").checked,
+      send: $("driftSend").checked,
+      width: $("driftWidth").checked,
+      reso: $("driftReso").checked,
+      swing: $("driftSwing").checked,
+    },
     weight: state.weight,
-    autopilot: state.autopilot,
-    cutoffGlide: state.cutoffGlide,
+    autopilot: $("autopilot").checked,
+    cutoffGlide: $("cutoffGlide").checked,
   };
 }
 
@@ -1518,7 +1540,12 @@ function applySnapshot(raw) {
     decay: "driftDecay", pattern: "driftPattern", chord: "driftChord", breakdown: "driftBreak",
     send: "driftSend", width: "driftWidth", reso: "driftReso", swing: "driftSwing",
   };
-  Object.entries(driftIds).forEach(([key, id]) => { $(id).checked = !!state.drift[key]; });
+  Object.entries(driftIds).forEach(([key, id]) => {
+    $(id).checked = !!state.drift[key];
+    $(id).dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  $("autopilot").dispatchEvent(new Event("change", { bubbles: true }));
+  $("cutoffGlide").dispatchEvent(new Event("change", { bubbles: true }));
   const weightIds = {
     cutoff: "wCutoff", feedback: "wFeedback", damp: "wDamp", reverb: "wReverb",
     decay: "wDecay", pattern: "wPattern", chord: "wChord", breakdown: "wBreak",

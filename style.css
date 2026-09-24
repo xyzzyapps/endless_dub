@@ -207,6 +207,15 @@ input[type="color"] {
   background: #01070f;
   cursor: pointer;
 }
+.swatches { display: flex; gap: 4px; align-items: center; }
+.swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.swatch.on { outline: 2px solid var(--ink); outline-offset: 1px; }
 
 select {
   font: inherit;
