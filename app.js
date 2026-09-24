@@ -65,7 +65,7 @@ const state = {
     chord: 1,
     breakdown: 1,
   },
-  stepWeight: [1, 0.35, 0.55, 0.3, 0.85, 0.4, 0.6, 0.3, 0.9, 0.35, 0.55, 0.3, 0.85, 0.4, 0.7, 0.3],
+  stepWeight: {},
   cutoffGlide: true,
   cutoffTarget: 680,
   cutoffRetarget: 0,
@@ -108,68 +108,76 @@ function chordName() {
   return name + " " + flavors[Math.abs(state.degree) % flavors.length];
 }
 
-function hit(step, base) {
-  return Math.random() < base * state.stepWeight[step];
+const STEP_CURVE = [1, 0.35, 0.55, 0.3, 0.85, 0.4, 0.6, 0.3, 0.9, 0.35, 0.55, 0.3, 0.85, 0.4, 0.7, 0.3];
+
+function fillStepWeights() {
+  ROWS.forEach((row) => {
+    state.stepWeight[row.id] = STEP_CURVE.slice();
+  });
 }
 
-function pickWeighted(pool) {
+function hit(voice, step, base) {
+  return Math.random() < base * state.stepWeight[voice][step];
+}
+
+function pickWeighted(voice, pool) {
   let total = 0;
-  for (let i = 0; i < pool.length; i++) total += Math.max(0.04, state.stepWeight[pool[i]]);
+  for (let i = 0; i < pool.length; i++) total += Math.max(0.04, state.stepWeight[voice][pool[i]]);
   let r = Math.random() * total;
   for (let i = 0; i < pool.length; i++) {
-    r -= Math.max(0.04, state.stepWeight[pool[i]]);
+    r -= Math.max(0.04, state.stepWeight[voice][pool[i]]);
     if (r <= 0) return pool[i];
   }
   return pool[pool.length - 1];
 }
 
 function makePattern() {
-  const kick = Array.from({ length: 16 }, (_, i) => (i % 4 === 0 && hit(i, 0.95) ? 1 : 0));
-  if (!kick.some((v) => v)) kick[pickWeighted([0, 4, 8, 12])] = 1;
+  const kick = Array.from({ length: 16 }, (_, i) => (i % 4 === 0 && hit("kick", i, 0.95) ? 1 : 0));
+  if (!kick.some((v) => v)) kick[pickWeighted("kick", [0, 4, 8, 12])] = 1;
 
-  const hat = Array.from({ length: 16 }, (_, i) => (hit(i, i % 2 === 0 ? 0.35 : 0.72) ? 1 : 0));
+  const hat = Array.from({ length: 16 }, (_, i) => (hit("hat", i, i % 2 === 0 ? 0.35 : 0.72) ? 1 : 0));
   hat[0] = 0;
 
   const open = Array(16).fill(0);
-  open[pickWeighted([6, 10, 14])] = 1;
+  open[pickWeighted("open", [6, 10, 14])] = 1;
   if (Math.random() < 0.35) {
-    const extra = pickWeighted([6, 10, 14]);
-    if (hit(extra, 1)) open[extra] = 1;
+    const extra = pickWeighted("open", [6, 10, 14]);
+    if (hit("open", extra, 1)) open[extra] = 1;
   }
 
   const snare = Array(16).fill(0);
-  if (hit(4, 0.95)) snare[4] = 1;
-  if (hit(12, 0.95)) snare[12] = 1;
-  if (!snare[4] && !snare[12]) snare[pickWeighted([4, 12])] = 1;
-  if (hit(13, 0.3)) snare[13] = 1;
+  if (hit("snare", 4, 0.95)) snare[4] = 1;
+  if (hit("snare", 12, 0.95)) snare[12] = 1;
+  if (!snare[4] && !snare[12]) snare[pickWeighted("snare", [4, 12])] = 1;
+  if (hit("snare", 13, 0.3)) snare[13] = 1;
 
   const perc = Array(16).fill(0);
-  if (hit(6, 0.9)) perc[6] = 1;
-  if (hit(14, 0.7)) perc[14] = 1;
-  if (hit(10, 0.25)) perc[10] = 1;
+  if (hit("perc", 6, 0.9)) perc[6] = 1;
+  if (hit("perc", 14, 0.7)) perc[14] = 1;
+  if (hit("perc", 10, 0.25)) perc[10] = 1;
 
   const bass = Array(16).fill(0);
-  if (hit(0, 1)) bass[0] = 1;
-  const off = pickWeighted([6, 7, 10, 14]);
-  if (hit(off, 0.85)) bass[off] = 1;
-  if (hit(8, 0.4)) bass[8] = 1;
+  if (hit("bass", 0, 1)) bass[0] = 1;
+  const off = pickWeighted("bass", [6, 7, 10, 14]);
+  if (hit("bass", off, 0.85)) bass[off] = 1;
+  if (hit("bass", 8, 0.4)) bass[8] = 1;
   if (!bass.some((v) => v)) bass[0] = 1;
 
   const stab = Array(16).fill(0);
   const candidates = [3, 6, 7, 10, 11, 14];
   const hits = 2 + Math.floor(Math.random() * 2);
   for (let n = 0; n < hits; n++) {
-    const i = pickWeighted(candidates);
-    if (hit(i, 0.9)) stab[i] = 1;
+    const i = pickWeighted("stab", candidates);
+    if (hit("stab", i, 0.9)) stab[i] = 1;
   }
-  if (!stab.some((v) => v)) stab[pickWeighted(candidates)] = 1;
+  if (!stab.some((v) => v)) stab[pickWeighted("stab", candidates)] = 1;
 
   const plate = Array(16).fill(0);
-  const plateAt = pickWeighted([2, 7, 10, 11, 15]);
+  const plateAt = pickWeighted("plate", [2, 7, 10, 11, 15]);
   plate[plateAt] = 1;
   if (Math.random() < 0.4) {
-    const extra = pickWeighted([2, 7, 10, 11, 15]);
-    if (hit(extra, 0.8)) plate[extra] = 1;
+    const extra = pickWeighted("plate", [2, 7, 10, 11, 15]);
+    if (hit("plate", extra, 0.8)) plate[extra] = 1;
   }
 
   state.patterns = { kick, hat, open, snare, perc, bass, stab, plate };
@@ -202,10 +210,10 @@ function renderGrids() {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "step " + row.cls + (on ? " on" : "") + (i % 4 === 0 ? " downbeat" : "");
-      b.style.setProperty("--step-w", String(state.stepWeight[i]));
+      b.style.setProperty("--step-w", String(state.stepWeight[row.id][i]));
       let drag = null;
       b.addEventListener("pointerdown", (e) => {
-        drag = { y: e.clientY, moved: false, w: state.stepWeight[i] };
+        drag = { y: e.clientY, moved: false, w: state.stepWeight[row.id][i] };
         b.setPointerCapture(e.pointerId);
       });
       b.addEventListener("pointermove", (e) => {
@@ -213,8 +221,8 @@ function renderGrids() {
         const dy = drag.y - e.clientY;
         if (Math.abs(dy) > 4) drag.moved = true;
         if (!drag.moved) return;
-        state.stepWeight[i] = clamp(drag.w + dy / 110, 0, 1);
-        paintWeights();
+        state.stepWeight[row.id][i] = clamp(drag.w + dy / 110, 0, 1);
+        b.style.setProperty("--step-w", state.stepWeight[row.id][i].toFixed(3));
       });
       b.addEventListener("pointerup", () => {
         if (drag && !drag.moved) {
@@ -231,9 +239,10 @@ function renderGrids() {
 }
 
 function paintWeights() {
-  document.querySelectorAll(".row").forEach((rowEl) => {
+  document.querySelectorAll(".row").forEach((rowEl, r) => {
+    const id = ROWS[r].id;
     rowEl.querySelectorAll(".step").forEach((step, i) => {
-      step.style.setProperty("--step-w", state.stepWeight[i].toFixed(3));
+      step.style.setProperty("--step-w", state.stepWeight[id][i].toFixed(3));
     });
   });
 }
@@ -244,7 +253,7 @@ function paintGrids() {
     const id = ROWS[r].id;
     rowEl.querySelectorAll(".step").forEach((step, i) => {
       step.classList.toggle("on", !!state.patterns[id][i]);
-      step.style.setProperty("--step-w", state.stepWeight[i].toFixed(3));
+      step.style.setProperty("--step-w", state.stepWeight[id][i].toFixed(3));
     });
   });
 }
@@ -594,20 +603,20 @@ function mutatePattern() {
   const w = state.weight.pattern;
   const hat = state.patterns.hat;
   if (Math.random() < w) {
-    const i = pickWeighted([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    const i = pickWeighted("hat", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     hat[i] = hat[i] ? 0 : 1;
   }
   if (Math.random() < 0.4 * w) {
     const open = state.patterns.open;
-    const idx = pickWeighted([2, 6, 10, 14]);
+    const idx = pickWeighted("open", [2, 6, 10, 14]);
     open[idx] = open[idx] ? 0 : 1;
     if (open.reduce((a, b) => a + b, 0) > 3) open[idx] = 0;
   }
   const stab = state.patterns.stab;
   if (Math.random() < 0.5 * w) {
-    const idx = pickWeighted([3, 6, 7, 10, 11, 14]);
+    const idx = pickWeighted("stab", [3, 6, 7, 10, 11, 14]);
     stab[idx] = stab[idx] ? 0 : 1;
-    if (stab.reduce((a, b) => a + b, 0) < 2) stab[pickWeighted([3, 6, 10, 14])] = 1;
+    if (stab.reduce((a, b) => a + b, 0) < 2) stab[pickWeighted("stab", [3, 6, 10, 14])] = 1;
     if (stab.reduce((a, b) => a + b, 0) > 4) stab[idx] = 0;
   }
   const kick = state.patterns.kick;
@@ -616,10 +625,10 @@ function mutatePattern() {
   const snare = state.patterns.snare;
   snare[4] = 1;
   snare[12] = 1;
-  if (Math.random() < 0.35 * w * state.stepWeight[13]) snare[13] = snare[13] ? 0 : 1;
+  if (Math.random() < 0.35 * w * state.stepWeight.snare[13]) snare[13] = snare[13] ? 0 : 1;
   if (Math.random() < 0.45 * w) {
     const plate = state.patterns.plate;
-    const idx = pickWeighted([2, 7, 10, 11, 15]);
+    const idx = pickWeighted("plate", [2, 7, 10, 11, 15]);
     plate[idx] = plate[idx] ? 0 : 1;
     if (plate.reduce((a, b) => a + b, 0) > 2) plate[idx] = 0;
     if (plate.reduce((a, b) => a + b, 0) === 0) plate[10] = 1;
@@ -1084,6 +1093,7 @@ function syncControls() {
 }
 
 function wire() {
+  fillStepWeights();
   seedPattern();
   renderGrids();
   $("keyName").textContent = chordName();
