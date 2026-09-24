@@ -221,7 +221,7 @@ function renderGrids() {
         const dy = drag.y - e.clientY;
         if (Math.abs(dy) > 4) drag.moved = true;
         if (!drag.moved) return;
-        state.stepWeight[row.id][i] = clamp(drag.w + dy / 110, 0, 1);
+        state.stepWeight[row.id][i] = clamp(drag.w + dy / 72, 0, 1);
         b.style.setProperty("--step-w", state.stepWeight[row.id][i].toFixed(3));
       });
       b.addEventListener("pointerup", () => {

@@ -223,28 +223,30 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 .step-hint { margin: 0 0 8px; }
 
 .step {
-  height: 22px;
+  --step-fill: var(--accent);
+  height: 28px;
   border-radius: 0;
   border: 1px solid #0a2744;
-  background: color-mix(in srgb, var(--accent) calc(6% + var(--step-w, 0.4) * 48%), #01070f);
+  background-color: #01070f;
+  background-image: linear-gradient(
+    to top,
+    var(--step-fill) 0,
+    var(--step-fill) calc(var(--step-w, 0) * 100%),
+    transparent calc(var(--step-w, 0) * 100%)
+  );
   cursor: pointer;
   padding: 0;
   touch-action: none;
 }
 
-.step.on {
-  background: var(--on);
-  border-color: var(--glow);
-  filter: brightness(calc(0.4 + var(--step-w, 1) * 0.75));
-  box-shadow: 0 0 calc(2px + var(--step-w, 1) * 10px) rgba(var(--accent-rgb), calc(0.15 + var(--step-w, 1) * 0.75));
-}
-.step.kick.on { background: var(--kick); }
-.step.chord.on { background: var(--glow); }
-.step.open.on { background: var(--glow); filter: brightness(1.15); }
-.step.snare.on { background: var(--snare); }
-.step.plate.on { background: var(--glow); }
+.step.on { border-color: var(--glow); box-shadow: inset 0 0 0 1px var(--glow); }
+.step.kick { --step-fill: var(--kick); }
+.step.chord { --step-fill: var(--glow); }
+.step.open { --step-fill: var(--glow); }
+.step.snare { --step-fill: var(--snare); }
+.step.plate { --step-fill: var(--glow); }
 .step.downbeat { box-shadow: inset 0 -2px 0 var(--line); }
-.step.on.downbeat { box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.85), inset 0 -2px 0 #021018; }
+.step.on.downbeat { box-shadow: inset 0 0 0 1px var(--glow), inset 0 -2px 0 var(--line); }
 
 .panel { padding: 12px 14px 14px; margin-bottom: 12px; }
 .panel.two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
