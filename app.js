@@ -42,7 +42,7 @@ const state = {
   bassLvl: 0.78,
   drive: 0.22,
   color: { hex: "#3ec2ff", r: 62, g: 194, b: 255 },
-  lvl: { kick: 1, hat: 1, open: 0.85, snare: 1, rim: 1, stab: 1, plate: 0.7 },
+  lvl: { kick: 1, hat: 1, open: 0.85, snare: 1, rim: 1, stab: 1, plate: 0 },
   len: { kick: 0.42, hat: 0.03, open: 0.22, snare: 0.14, rim: 0.07, bass: 0.55 },
   plate: { tension: 1, ring: 1.8, order: 6 },
   drift: {
@@ -1133,7 +1133,6 @@ function wire() {
   $("chord").addEventListener("click", () => shiftChord());
   $("clear").addEventListener("click", () => {
     ROWS.forEach((row) => {
-      if (row.id === "plate") return;
       state.patterns[row.id] = Array(16).fill(0);
       state.stepWeight[row.id] = Array(16).fill(0);
     });
