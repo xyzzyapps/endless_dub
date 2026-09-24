@@ -748,7 +748,8 @@ function applyBase(hex) {
   const g = (n >> 8) & 255;
   const b = n & 255;
   const [h, s, l] = rgbToHsl(r, g, b);
-  const sat = Math.max(0.35, Math.min(0.85, s || 0.55));
+  const grey = s < 0.12;
+  const sat = grey ? 0 : Math.max(0.35, Math.min(0.85, s));
   const accent = [r, g, b];
   const glow = hslToRgb(h, Math.min(0.9, sat + 0.1), 0.78);
   const step = hslToRgb(h, sat, 0.62);
