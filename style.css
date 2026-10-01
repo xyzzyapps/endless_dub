@@ -275,7 +275,7 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 .step-hint { margin: 0 0 8px; }
 .markov {
   display: grid;
-  grid-template-columns: 88px repeat(3, 1fr);
+  grid-template-columns: 72px repeat(7, minmax(44px, 1fr));
   overflow-x: auto;
   gap: 4px;
   margin-top: 10px;

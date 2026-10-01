@@ -7,12 +7,18 @@ const SHAPES = [
   { name: "Open 5", notes: [0, 7, 15, 14] },
   { name: "Minor 7", notes: [0, 3, 10, 19] },
   { name: "High 5", notes: [0, 7, 15, 26] },
+  { name: "Minor", notes: [0, 3, 7, 15] },
+  { name: "Sus", notes: [0, 5, 7, 14] },
+  { name: "Minor 9", notes: [0, 3, 10, 14] },
+  { name: "Major", notes: [0, 4, 11, 16] },
 ];
 
 function defaultMarkov() {
   const n = SHAPES.length;
   const grid = Array.from({ length: n }, () => Array(n).fill(0));
-  for (let i = 0; i < n; i++) grid[i][(i + 1) % n] = 100;
+  grid[0][1] = 100;
+  grid[1][2] = 100;
+  grid[2][0] = 100;
   return grid;
 }
 const ROWS = [

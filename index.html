@@ -55,7 +55,7 @@
   <h3>Chords, in plain words</h3>
   <p>Root is the home note. It starts on D. The low sub and the plate stay on that home note.</p>
   <p>The Chord menu moves the chord stab up or down to a nearby note that still fits the key. Harmonise should stay on for that. If you turn Harmonise off, New chord can jump to a note that does not fit, which sounds stranger. Minor 9 and sus on the home note do not move the stab. They are the same place as the home note.</p>
-  <p>Under Chord shapes there are three chords: Open 5, Minor 7, and High 5. The outlined row is the one playing now. Click a square to choose the next chord. Click it again to clear that row. Drag a square to share the 100 with the square beside it. It starts as Open 5, then Minor 7, then High 5, then back. An empty row is skipped.</p>
+  <p>Under Chord shapes every chord type has a row: Open 5, Minor 7, High 5, Minor, Sus, Minor 9, and Major. The outlined row is the one playing now. Click a square to choose the next chord. Click it again to clear that row. Drag a square to share the 100 with the square beside it. It starts as Open 5, then Minor 7, then High 5, then back. The other rows start empty, so they stay out of the loop until you click one. An empty row is skipped.</p>
   <h3>Echo, filter, and space</h3>
   <p>Delay time picks how long the echo waits, in musical lengths such as a dotted eighth. Feedback is how much of the echo is sent back in, from 20 to 88. Higher is wetter. It will not be pushed past 75 by Autopilot, so it does not turn into noise.</p>
   <p>Cutoff is the filter, in hertz. Lower sounds darker, higher sounds brighter. It starts at 680. Autopilot nudges it by about 20 hertz. Interpolate makes the filter glide. Turn it off and the filter jumps.</p>
@@ -177,7 +177,7 @@
 
   <section class="panel">
     <h2>Chord shapes</h2>
-    <p class="hint">The stab is three chords: Open 5, Minor 7, and High 5. A row is the chord playing now. A column is the chord that can follow it. Click a cell to choose the next chord. Click it again to clear the row. Drag a cell to split the 100 with the next cell. A row always adds up to 100, unless you clear it. It starts as Open 5, then Minor 7, then High 5, then back. An empty row is skipped.</p>
+    <p class="hint">Every chord type has a row and a column: Open 5, Minor 7, High 5, Minor, Sus, Minor 9, and Major. A row is the chord playing now. Click a cell to make that the next chord. Click it again to clear the row. Drag a cell to split the 100 with the next cell. The first three rows start as the old loop. The other rows start empty. An empty row is skipped.</p>
     <div id="markov" class="markov"></div>
   </section>
 
