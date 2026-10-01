@@ -273,6 +273,29 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 .steps { display: grid; grid-template-columns: repeat(16, 1fr); gap: 3px; }
 
 .step-hint { margin: 0 0 8px; }
+.markov {
+  display: grid;
+  grid-template-columns: 72px repeat(7, minmax(42px, 1fr));
+  overflow-x: auto;
+  gap: 4px;
+  margin-top: 10px;
+}
+.mhead {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+  align-self: end;
+}
+.mcell {
+  --step-fill: var(--accent);
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: linear-gradient(to top, var(--step-fill) calc(var(--step-w, 0) * 100%), var(--bg) 0);
+  cursor: ns-resize;
+}
+.mcell.now { box-shadow: inset 0 0 0 2px var(--accent); }
 
 .top-menu {
   position: fixed;
@@ -348,6 +371,11 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
   touch-action: none;
 }
 
+.step.playhead {
+  outline: 2px solid var(--glow);
+  outline-offset: -2px;
+  z-index: 1;
+}
 .step.on {
   border: 4px solid var(--accent);
   box-shadow: inset 0 0 0 3px var(--bg), inset 0 0 0 6px var(--accent);

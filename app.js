@@ -3,6 +3,25 @@
 // and Zykure's spicy fork. The synthesis and patterns are original.
 
 const NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+const SHAPES = [
+  { name: "Open 5", notes: [0, 7, 15, 14] },
+  { name: "Minor 7", notes: [0, 3, 10, 19] },
+  { name: "High 5", notes: [0, 7, 15, 26] },
+  { name: "Minor", notes: [0, 3, 7, 15] },
+  { name: "Sus", notes: [0, 5, 7, 14] },
+  { name: "Minor 9", notes: [0, 3, 10, 14] },
+  { name: "Major", notes: [0, 4, 11, 16] },
+];
+
+function defaultMarkov() {
+  const n = SHAPES.length;
+  const grid = Array.from({ length: n }, () => Array(n).fill(0));
+  grid[0][1] = 100;
+  grid[1][2] = 100;
+  grid[2][0] = 100;
+  for (let i = 3; i < n; i++) grid[i][0] = 100;
+  return grid;
+}
 const ROWS = [
   { id: "kick", name: "Kick", cls: "kick" },
   { id: "hat", name: "Hi-hat", cls: "" },
@@ -48,6 +67,8 @@ const state = {
   color: { hex: "#3ec2ff", r: 62, g: 194, b: 255 },
   lvl: { kick: 1, hat: 1, open: 0.85, snare: 1, rim: 1, stab: 1, plate: 0 },
   mute: { kick: false, hat: false, open: false, snare: false, rim: false, bass: false, stab: false, plate: false },
+  shape: 0,
+  markov: defaultMarkov(),
   len: { kick: 0.42, hat: 0.03, open: 0.22, snare: 0.14, rim: 0.07, bass: 0.55 },
   plate: { tension: 1, ring: 1.8, order: 6 },
   drift: {
@@ -318,6 +339,7 @@ function paintWeights() {
 }
 
 function paintGrids() {
+  shownCol = -1;
   const rows = document.querySelectorAll(".row");
   rows.forEach((rowEl, r) => {
     const id = ROWS[r].id;
@@ -447,10 +469,76 @@ function playBass(t, step) {
 
 function stabNotes() {
   const r = state.root + currentChord().semi;
-  const roll = (state.bar + currentChord().semi) % 3;
-  if (roll === 0) return [r, r + 7, r + 15, r + 14];
-  if (roll === 1) return [r, r + 3, r + 10, r + 19];
-  return [r, r + 7, r + 15, r + 26];
+  const shape = SHAPES[state.shape] || SHAPES[0];
+  return shape.notes.map((n) => r + n);
+}
+
+function advanceShape() {
+  const row = state.markov[state.shape] || [];
+  let total = 0;
+  for (let i = 0; i < SHAPES.length; i++) total += row[i] || 0;
+  if (total <= 0) return;
+  let pick = Math.random() * total;
+  for (let i = 0; i < SHAPES.length; i++) {
+    pick -= row[i] || 0;
+    if (pick <= 0) {
+      state.shape = i;
+      return;
+    }
+  }
+}
+
+function paintMarkov() {
+  document.querySelectorAll("#markov .mcell").forEach((cell) => {
+    const from = Number(cell.dataset.from);
+    const to = Number(cell.dataset.to);
+    const w = state.markov[from][to];
+    cell.style.setProperty("--step-w", (w / 100).toFixed(3));
+    cell.title = SHAPES[from].name + " → " + SHAPES[to].name + "  " + Math.round(w) + " / 100";
+    cell.classList.toggle("now", from === state.shape);
+  });
+}
+
+function renderMarkov() {
+  const host = $("markov");
+  if (!host) return;
+  host.innerHTML = "";
+  const corner = document.createElement("span");
+  corner.className = "mhead";
+  corner.textContent = "now \\ next";
+  host.appendChild(corner);
+  SHAPES.forEach((shape) => {
+    const head = document.createElement("span");
+    head.className = "mhead";
+    head.textContent = shape.name;
+    host.appendChild(head);
+  });
+  SHAPES.forEach((shape, from) => {
+    const label = document.createElement("span");
+    label.className = "mhead";
+    label.textContent = shape.name;
+    host.appendChild(label);
+    for (let to = 0; to < SHAPES.length; to++) {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "mcell";
+      cell.dataset.from = String(from);
+      cell.dataset.to = String(to);
+      let drag = null;
+      cell.addEventListener("pointerdown", (e) => {
+        drag = { y: e.clientY, w: state.markov[from][to] };
+        cell.setPointerCapture(e.pointerId);
+      });
+      cell.addEventListener("pointermove", (e) => {
+        if (!drag) return;
+        state.markov[from][to] = clamp(drag.w + (drag.y - e.clientY) / 0.72, 0, 100);
+        paintMarkov();
+      });
+      cell.addEventListener("pointerup", () => { drag = null; });
+      host.appendChild(cell);
+    }
+  });
+  paintMarkov();
 }
 
 function playStab(t) {
@@ -685,6 +773,8 @@ function playStep(step, t) {
 }
 
 function onBar() {
+  advanceShape();
+  paintMarkov();
   state.bar += 1;
   state.holdBars += 1;
   if (state.breakdown > 0) state.breakdown -= 1;
@@ -1170,8 +1260,25 @@ function drawPlate(now) {
 
 let plateFrame = 0;
 
+let shownCol = -1;
+
+function paintPlayhead() {
+  let col = -1;
+  if (state.playing && ctx && state.nextTime) {
+    const sixteenth = (60 / state.bpm) / 4;
+    const ahead = (state.nextTime - ctx.currentTime) / sixteenth;
+    col = (state.step - Math.ceil(ahead) + 160) % 16;
+  }
+  if (col === shownCol) return;
+  shownCol = col;
+  document.querySelectorAll("#grids .step").forEach((step, i) => {
+    step.classList.toggle("playhead", i % 16 === col);
+  });
+}
+
 function draw(now) {
   requestAnimationFrame(draw);
+  paintPlayhead();
   plateFrame += 1;
   const phone = window.innerWidth < 800;
   if (!phone || plateFrame % 2 === 0 || recording) drawPlate(now || performance.now());
@@ -1265,6 +1372,7 @@ function wire() {
   fillStepWeights();
   seedPattern();
   renderGrids();
+  renderMarkov();
   fillChordSelect();
 
   $("cutoffGlide").addEventListener("change", () => { state.cutoffGlide = $("cutoffGlide").checked; });
@@ -1579,6 +1687,11 @@ function cleanSnapshot(data) {
     freeSemi: clampNum(src.freeSemi, 0, 11, 0),
     freeQuality: ["min", "maj", "sus", "min9"].includes(src.freeQuality) ? src.freeQuality : "min",
     harmonise: src.harmonise !== false,
+    shape: clampNum(src.shape, 0, SHAPES.length - 1, 0),
+    markov: defaultMarkov().map((fallback, from) => fallback.map((cell, to) => {
+      const row = src.markov && src.markov[from];
+      return clampNum(row && row[to], 0, 100, cell);
+    })),
     delayBeats,
     feedback: clampNum(src.feedback, 0.2, 0.88, 0.7),
     damp: clampNum(src.damp, 400, 5000, 1400),
@@ -1621,6 +1734,8 @@ function songSnapshot() {
     freeSemi: state.freeSemi,
     freeQuality: state.freeQuality,
     harmonise: $("harmonise").checked,
+    shape: state.shape,
+    markov: state.markov,
     stepWeightPercent: true,
     weightPercent: true,
     delayBeats: state.delayBeats,
@@ -1686,6 +1801,8 @@ function applySnapshot(raw) {
     freeSemi: data.freeSemi,
     freeQuality: data.freeQuality,
     harmonise: data.harmonise,
+    shape: data.shape,
+    markov: data.markov,
     delayBeats: data.delayBeats,
     feedback: data.feedback,
     damp: data.damp,
@@ -1737,6 +1854,7 @@ function applySnapshot(raw) {
     $(id).closest(".pair").classList.toggle("muted", $(id).checked);
   });
   fillChordSelect();
+  paintMarkov();
   $("div").value = String(state.delayBeats);
   $("div").dispatchEvent(new Event("change", { bubbles: true }));
   $("autopilot").checked = !!state.autopilot;
