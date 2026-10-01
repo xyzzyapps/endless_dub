@@ -473,14 +473,31 @@ function stabNotes() {
   return shape.notes.map((n) => r + n);
 }
 
-function advanceShape() {
-  const row = state.markov[state.shape] || [];
+function shapeWeight(from, to) {
+  const row = state.markov[from];
+  const w = row && Number(row[to]);
+  return Number.isFinite(w) ? w : 0;
+}
+
+function rowTotal(from) {
   let total = 0;
-  for (let i = 0; i < SHAPES.length; i++) total += row[i] || 0;
-  if (total <= 0) return;
+  for (let i = 0; i < SHAPES.length; i++) total += shapeWeight(from, i);
+  return total;
+}
+
+function advanceShape() {
+  const n = SHAPES.length;
+  const total = rowTotal(state.shape);
+  if (total <= 0) {
+    for (let hop = 0; hop < n; hop++) {
+      state.shape = (state.shape + 1) % n;
+      if (rowTotal(state.shape) > 0) return;
+    }
+    return;
+  }
   let pick = Math.random() * total;
-  for (let i = 0; i < SHAPES.length; i++) {
-    pick -= row[i] || 0;
+  for (let i = 0; i < n; i++) {
+    pick -= shapeWeight(state.shape, i);
     if (pick <= 0) {
       state.shape = i;
       return;
@@ -492,7 +509,7 @@ function paintMarkov() {
   document.querySelectorAll("#markov .mcell").forEach((cell) => {
     const from = Number(cell.dataset.from);
     const to = Number(cell.dataset.to);
-    const w = state.markov[from][to];
+    const w = shapeWeight(from, to);
     cell.style.setProperty("--step-w", (w / 100).toFixed(3));
     cell.title = SHAPES[from].name + " → " + SHAPES[to].name + "  " + Math.round(w) + " / 100";
     cell.classList.toggle("now", from === state.shape);
