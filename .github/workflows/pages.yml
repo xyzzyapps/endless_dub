@@ -25,7 +25,13 @@ jobs:
       - name: Collect site files
         run: |
           mkdir public
-          cp index.html app.js style.css preview.png favicon.svg public/
+          sha="${GITHUB_SHA::7}"
+          sed -e "s/content=\"dev\"/content=\"$sha\"/" \
+              -e "s/href=\"style.css\"/href=\"style.css?v=$sha\"/" \
+              -e "s/src=\"app.js\"/src=\"app.js?v=$sha\"/" \
+              index.html > public/index.html
+          cp app.js style.css preview.png favicon.svg public/
+          printf '%s\n' "$sha" > public/version.txt
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public

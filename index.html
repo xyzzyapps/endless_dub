@@ -8,6 +8,23 @@
 <meta name="keywords" content="dub techno, generative music, browser synthesizer, web audio, endless dub, algorithmic techno, step sequencer, dub delay, cymatics, online drum machine, ambient techno">
 <meta name="author" content="Xyzzy Apps">
 <meta name="theme-color" content="#02060d">
+<meta name="build" content="dev">
+<script>
+(function () {
+  var mine = document.querySelector('meta[name="build"]');
+  var here = mine && mine.content;
+  if (!here || here === "dev") return;
+  fetch("version.txt?t=" + Date.now(), { cache: "no-store" }).then(function (r) {
+    return r.ok ? r.text() : "";
+  }).then(function (remote) {
+    remote = (remote || "").trim();
+    if (!remote || remote === here) return;
+    var params = new URLSearchParams(location.search);
+    params.set("v", remote);
+    location.replace(location.pathname + "?" + params.toString() + location.hash);
+  }).catch(function () {});
+})();
+</script>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="canonical" href="https://xyzzyapps.github.io/endless_dub/">
 <meta property="og:type" content="website">
