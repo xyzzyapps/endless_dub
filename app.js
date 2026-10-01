@@ -7,18 +7,12 @@ const SHAPES = [
   { name: "Open 5", notes: [0, 7, 15, 14] },
   { name: "Minor 7", notes: [0, 3, 10, 19] },
   { name: "High 5", notes: [0, 7, 15, 26] },
-  { name: "Minor", notes: [0, 3, 7, 15] },
-  { name: "Sus", notes: [0, 5, 7, 14] },
-  { name: "Minor 9", notes: [0, 3, 10, 14] },
-  { name: "Major", notes: [0, 4, 11, 16] },
 ];
 
 function defaultMarkov() {
   const n = SHAPES.length;
   const grid = Array.from({ length: n }, () => Array(n).fill(0));
-  const live = n - 3;
-  for (let i = 0; i < live - 1; i++) grid[i][i + 1] = 100;
-  grid[SHAPES.findIndex((s) => s.name === "Minor")][SHAPES.findIndex((s) => s.name === "Sus")] = 100;
+  for (let i = 0; i < n; i++) grid[i][(i + 1) % n] = 100;
   return grid;
 }
 const ROWS = [
@@ -468,7 +462,7 @@ function playBass(t, step) {
 
 function stabNotes() {
   const r = state.root + currentChord().semi;
-  const shape = SHAPES[((state.shape % 3) + 3) % 3];
+  const shape = SHAPES[state.shape] || SHAPES[0];
   return shape.notes.map((n) => r + n);
 }
 
@@ -1705,10 +1699,12 @@ function cleanSnapshot(data) {
     freeQuality: ["min", "maj", "sus", "min9"].includes(src.freeQuality) ? src.freeQuality : "min",
     harmonise: src.harmonise !== false,
     shape: clampNum(src.shape, 0, SHAPES.length - 1, 0),
-    markov: defaultMarkov().map((fallback, from) => fallback.map((cell, to) => {
-      const row = src.markov && src.markov[from];
-      return clampNum(row && row[to], 0, 100, cell);
-    })),
+    markov: (Array.isArray(src.markov) && src.markov.length === SHAPES.length)
+      ? defaultMarkov().map((fallback, from) => fallback.map((cell, to) => {
+        const row = src.markov[from];
+        return clampNum(row && row[to], 0, 100, cell);
+      }))
+      : defaultMarkov(),
     delayBeats,
     feedback: clampNum(src.feedback, 0.2, 0.88, 0.7),
     damp: clampNum(src.damp, 400, 5000, 1400),
