@@ -783,7 +783,7 @@ function buildSrs(input, output) {
 }
 
 function applyParams() {
-  if (!ctx) return;
+  if (!ctx || (window.DubEngine && DubEngine.on)) return;
   const beat = 60 / state.bpm;
   delayL.delayTime.setTargetAtTime(beat * state.delayBeats, ctx.currentTime, 0.05);
   delayR.delayTime.setTargetAtTime(beat * state.delayBeats, ctx.currentTime, 0.05);
@@ -1230,6 +1230,7 @@ function glideCutoff() {
 
 function scheduler() {
   glideCutoff();
+  if (window.DubEngine && DubEngine.on) return;
   if (!state.playing) return;
   const horizon = ctx.currentTime + 0.12;
   const sixteenth = (60 / state.bpm) / 4;
@@ -1338,7 +1339,9 @@ let shownCol = -1;
 
 function paintPlayhead() {
   let col = -1;
-  if (state.playing && ctx && state.nextTime) {
+  if (window.DubEngine && DubEngine.on) {
+    col = state.playing ? DubEngine.step : -1;
+  } else if (state.playing && ctx && state.nextTime) {
     const sixteenth = (60 / state.bpm) / 4;
     const ahead = (state.nextTime - ctx.currentTime) / sixteenth;
     col = (state.step - Math.ceil(ahead) + 160) % 16;
@@ -1352,6 +1355,7 @@ function paintPlayhead() {
 
 function draw(now) {
   requestAnimationFrame(draw);
+  if (window.DubEngine && DubEngine.on && state.playing) glideCutoff();
   paintPlayhead();
   plateFrame += 1;
   const phone = window.innerWidth < 800;
@@ -1460,15 +1464,22 @@ function wire() {
   });
 
   $("play").addEventListener("click", async () => {
-    if (!ctx) buildGraph();
-    if (ctx.state === "suspended") await ctx.resume();
-    state.playing = !state.playing;
-    $("play").textContent = state.playing ? "Stop" : "Play";
-    if (state.playing) {
-      state.nextTime = ctx.currentTime + 0.06;
-      state.step = 0;
-      if (!timer) timer = setInterval(scheduler, 25);
+    try {
+      await DubEngine.toggle(state);
+      ctx = DubEngine.context;
+      master = DubEngine.master;
+      analyser = DubEngine.analyser;
+    } catch (err) {
+      if (!ctx) buildGraph();
+      if (ctx.state === "suspended") await ctx.resume();
+      state.playing = !state.playing;
+      if (state.playing) {
+        state.nextTime = ctx.currentTime + 0.06;
+        state.step = 0;
+        if (!timer) timer = setInterval(scheduler, 25);
+      }
     }
+    $("play").textContent = state.playing ? "Stop" : "Play";
   });
 
   $("bpm").addEventListener("input", () => {
