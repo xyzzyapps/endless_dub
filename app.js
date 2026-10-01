@@ -16,10 +16,8 @@ const SHAPES = [
 function defaultMarkov() {
   const n = SHAPES.length;
   const grid = Array.from({ length: n }, () => Array(n).fill(0));
-  grid[0][1] = 100;
-  grid[1][2] = 100;
-  grid[2][0] = 100;
-  for (let i = 3; i < n; i++) grid[i][0] = 100;
+  const live = n - 2;
+  for (let i = 0; i < live; i++) grid[i][(i + 1) % live] = 100;
   return grid;
 }
 const ROWS = [
@@ -86,7 +84,7 @@ const state = {
     swing: true,
   },
   weight: {
-    cutoff: 100,
+    cutoff: 20,
     feedback: 25,
     damp: 100,
     reverb: 100,
@@ -469,7 +467,7 @@ function playBass(t, step) {
 
 function stabNotes() {
   const r = state.root + currentChord().semi;
-  const shape = SHAPES[state.shape] || SHAPES[0];
+  const shape = SHAPES[((state.shape % 3) + 3) % 3];
   return shape.notes.map((n) => r + n);
 }
 
@@ -1155,10 +1153,11 @@ function glideCutoff() {
   const dt = Math.min(0.1, Math.max(0.001, now - (state.cutoffStamp || now)));
   state.cutoffStamp = now;
   if (now >= state.cutoffRetarget) {
-    const span = 280 + 1700 * state.weight.cutoff / 100;
+    const span = state.weight.cutoff;
     const lo = clamp(state.cutoff - span, 160, 2400);
     const hi = clamp(state.cutoff + span, 160, 2400);
-    state.cutoffTarget = clamp(lo + Math.random() * Math.max(80, hi - lo), 160, 2400);
+    const room = Math.max(0, hi - lo);
+    state.cutoffTarget = room === 0 ? state.cutoff : clamp(lo + Math.random() * room, 160, 2400);
     state.cutoffRetarget = now + 1.2 + Math.random() * (4.5 - state.weight.cutoff / 100 * 2);
   }
   const rate = 0.45 + state.weight.cutoff / 100 * 1.6;
@@ -1669,7 +1668,7 @@ function cleanSnapshot(data) {
   const weightIds = ["cutoff", "feedback", "damp", "reverb", "decay", "pattern", "chord", "breakdown", "send", "width", "reso", "swing"];
   weightIds.forEach((key) => {
     drift[key] = !!(src.drift && src.drift[key]);
-    const fallback = key === "feedback" ? 25 : 100;
+    const fallback = key === "feedback" ? 25 : key === "cutoff" ? 20 : 100;
     const raw = src.weight && src.weight[key];
     weight[key] = src.weightPercent
       ? clampNum(raw, 0, 100, fallback)

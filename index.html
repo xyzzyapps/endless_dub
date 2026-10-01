@@ -55,10 +55,10 @@
   <h3>Chords, in plain words</h3>
   <p>Root is the home note. It starts on D. The low sub and the plate stay on that home note.</p>
   <p>The Chord menu moves the chord stab up or down to a nearby note that still fits the key. Harmonise should stay on for that. If you turn Harmonise off, New chord can jump to a note that does not fit, which sounds stranger. Minor 9 and sus on the home note do not move the stab. They are the same place as the home note.</p>
-  <p>Under Chord shapes, the grid decides which kind of chord comes next. The outlined row is the one playing now. Each square in that row is a possible next chord. Drag a square up if you want that next chord more often. It starts on the original loop: Open 5, then Minor 7, then High 5, then back. The other chords are there if you drag a path to them. An empty row is skipped.</p>
+  <p>Under Chord shapes, the grid decides which kind of chord comes next. The outlined row is the one playing now. Each square in that row is a possible next chord. Drag a square up if you want that next chord more often. The outline walks the rows that have a square filled in. The last two rows start empty, so the chain loops back before them. The notes stay the original three shapes. An empty row is skipped.</p>
   <h3>Echo, filter, and space</h3>
   <p>Delay time picks how long the echo waits, in musical lengths such as a dotted eighth. Feedback is how much of the echo is sent back in, from 20 to 88. Higher is wetter. It will not be pushed past 75 by Autopilot, so it does not turn into noise.</p>
-  <p>Cutoff is the filter, in hertz. Lower sounds darker, higher sounds brighter. It starts at 680. Interpolate makes the filter glide. Turn it off and the filter jumps.</p>
+  <p>Cutoff is the filter, in hertz. Lower sounds darker, higher sounds brighter. It starts at 680. Autopilot nudges it by about 20 hertz. Interpolate makes the filter glide. Turn it off and the filter jumps.</p>
   <p>Most other sliders are simply 0 to 100: how much echo is sent, how much reverb, how much warmth, how wide the stereo image is. You can turn them until it sounds right. The number is a position on that slider, not a special unit.</p>
   <h3>Autopilot</h3>
   <p>Leave this on if you want the page to keep the jam moving. A ticked box is allowed to wander. The small slider under it is how far it may wander, from 0 to 100.</p>
@@ -177,7 +177,7 @@
 
   <section class="panel">
     <h2>Chord shapes</h2>
-    <p class="hint">The stab is one of seven chords: Open 5, Minor 7, High 5, Minor, Sus, Minor 9, and Major. This grid is a Markov chain. A row is the chord playing now. A column is the chord that can follow it. Drag a cell from 0 to 100. The next bar is chosen from that row, and a brighter cell is more likely. It starts as the original loop through the first three chords, one per bar. The other chords point back to Open 5 until you drag a different path. An empty row is skipped.</p>
+    <p class="hint">The stab is one of seven chords: Open 5, Minor 7, High 5, Minor, Sus, Minor 9, and Major. This grid is a Markov chain. A row is the chord playing now. A column is the chord that can follow it. Drag a cell from 0 to 100. The next bar is chosen from that row, and a brighter cell is more likely. The last two rows start empty, and the chain loops through the rows above them. The sound stays the original three shapes. An empty row is skipped.</p>
     <div id="markov" class="markov"></div>
   </section>
 
@@ -234,7 +234,7 @@
   <section class="panel">
     <h2>Autopilot may drift</h2>
     <div class="drift">
-      <label class="drift-item"><span><input id="driftCutoff" type="checkbox" checked> Cutoff</span><input id="wCutoff" type="range" min="0" max="100" step="1" value="100"><b id="wCutoffVal">100</b></label>
+      <label class="drift-item"><span><input id="driftCutoff" type="checkbox" checked> Cutoff</span><input id="wCutoff" type="range" min="0" max="100" step="1" value="20"><b id="wCutoffVal">20</b></label>
       <label class="drift-item"><span><input id="driftFeedback" type="checkbox" checked> Feedback</span><input id="wFeedback" type="range" min="0" max="100" step="1" value="25"><b id="wFeedbackVal">25</b></label>
       <label class="drift-item"><span><input id="driftDamp" type="checkbox"> Damp</span><input id="wDamp" type="range" min="0" max="100" step="1" value="100"><b id="wDampVal">100</b></label>
       <label class="drift-item"><span><input id="driftReverb" type="checkbox"> Reverb</span><input id="wReverb" type="range" min="0" max="100" step="1" value="100"><b id="wReverbVal">100</b></label>
