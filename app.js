@@ -498,13 +498,58 @@ function advanceShape() {
   }
 }
 
+function balanceRow(from, locked) {
+  const row = state.markov[from];
+  const lockedW = clamp(row[locked] || 0, 0, 100);
+  let otherSum = 0;
+  for (let i = 0; i < row.length; i++) if (i !== locked) otherSum += Math.max(0, Number(row[i]) || 0);
+  if (lockedW <= 0 && otherSum <= 0) {
+    row.fill(0);
+    return;
+  }
+  if (otherSum <= 0) {
+    row.fill(0);
+    row[locked] = lockedW;
+    if (lockedW < 100) row[(locked + 1) % row.length] = 100 - lockedW;
+    return;
+  }
+  const rest = 100 - lockedW;
+  let used = 0;
+  let biggest = -1;
+  let biggestI = 0;
+  for (let i = 0; i < row.length; i++) {
+    if (i === locked) continue;
+    const share = Math.round((Math.max(0, Number(row[i]) || 0) / otherSum) * rest);
+    row[i] = share;
+    used += share;
+    if (share >= biggest) {
+      biggest = share;
+      biggestI = i;
+    }
+  }
+  row[locked] = lockedW;
+  row[biggestI] = Math.max(0, row[biggestI] + (100 - lockedW - used));
+}
+
+function normalizeRow(from) {
+  const row = state.markov[from];
+  const sum = row.reduce((total, w) => total + (Number.isFinite(w) ? w : 0), 0);
+  if (sum <= 0) {
+    row.fill(0);
+    return;
+  }
+  const locked = row.findIndex((w) => w > 0);
+  balanceRow(from, locked < 0 ? 0 : locked);
+}
+
 function paintMarkov() {
   document.querySelectorAll("#markov .mcell").forEach((cell) => {
     const from = Number(cell.dataset.from);
     const to = Number(cell.dataset.to);
     const w = shapeWeight(from, to);
     cell.style.setProperty("--step-w", (w / 100).toFixed(3));
-    cell.title = SHAPES[from].name + " → " + SHAPES[to].name + "  " + Math.round(w) + " / 100";
+    cell.textContent = w <= 0 ? "" : String(Math.round(w));
+    cell.title = SHAPES[from].name + " → " + SHAPES[to].name;
     cell.classList.toggle("now", from === state.shape);
   });
 }
@@ -536,15 +581,27 @@ function renderMarkov() {
       cell.dataset.to = String(to);
       let drag = null;
       cell.addEventListener("pointerdown", (e) => {
-        drag = { y: e.clientY, w: state.markov[from][to] };
+        drag = { y: e.clientY, w: state.markov[from][to], moved: false };
         cell.setPointerCapture(e.pointerId);
       });
       cell.addEventListener("pointermove", (e) => {
         if (!drag) return;
+        if (Math.abs(e.clientY - drag.y) > 4) drag.moved = true;
+        if (!drag.moved) return;
         state.markov[from][to] = clamp(drag.w + (drag.y - e.clientY) / 0.72, 0, 100);
+        balanceRow(from, to);
         paintMarkov();
       });
-      cell.addEventListener("pointerup", () => { drag = null; });
+      cell.addEventListener("pointerup", () => {
+        if (!drag) return;
+        if (!drag.moved) {
+          const sole = state.markov[from].every((w, i) => (i === to ? w >= 99 : w <= 0));
+          state.markov[from].fill(0);
+          if (!sole) state.markov[from][to] = 100;
+        }
+        drag = null;
+        paintMarkov();
+      });
       host.appendChild(cell);
     }
   });
@@ -1867,6 +1924,7 @@ function applySnapshot(raw) {
     $(id).closest(".pair").classList.toggle("muted", $(id).checked);
   });
   fillChordSelect();
+  state.markov.forEach((_, from) => normalizeRow(from));
   paintMarkov();
   $("div").value = String(state.delayBeats);
   $("div").dispatchEvent(new Event("change", { bubbles: true }));

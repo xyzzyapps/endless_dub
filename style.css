@@ -289,12 +289,15 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 }
 .mcell {
   --step-fill: var(--accent);
-  height: 36px;
+  height: 44px;
   padding: 0;
   border: 1px solid var(--line);
   background: linear-gradient(to top, var(--step-fill) calc(var(--step-w, 0) * 100%), var(--bg) 0);
+  color: var(--ink);
+  font-size: 12px;
   cursor: ns-resize;
 }
+button.mcell:hover { background: linear-gradient(to top, var(--step-fill) calc(var(--step-w, 0) * 100%), var(--bg) 0); color: var(--ink); }
 .mcell.now { box-shadow: inset 0 0 0 2px var(--accent); }
 
 .top-menu {
