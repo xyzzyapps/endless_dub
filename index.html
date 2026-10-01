@@ -55,7 +55,7 @@
   <h3>Chords, in plain words</h3>
   <p>Root is the home note. It starts on D. The low sub and the plate stay on that home note.</p>
   <p>The Chord menu moves the chord stab up or down to a nearby note that still fits the key. Harmonise should stay on for that. If you turn Harmonise off, New chord can jump to a note that does not fit, which sounds stranger. Minor 9 and sus on the home note do not move the stab. They are the same place as the home note.</p>
-  <p>Under Chord shapes, the grid decides which kind of chord comes next. The outlined row is the one playing now. Each square in that row is a possible next chord. Drag a square up if you want that next chord more often. The outline walks the rows that have a square filled in. The last two rows start empty, so the chain loops back before them. The notes stay the original three shapes. An empty row is skipped.</p>
+  <p>Under Chord shapes, the grid decides which kind of chord comes next. The outlined row is the one playing now. Each square in that row is a possible next chord. Drag a square up if you want that next chord more often. The outline walks the rows that have a square filled in. Sus and the two rows under it start empty, so the chain loops back before them. The notes stay the original three shapes. An empty row is skipped.</p>
   <h3>Echo, filter, and space</h3>
   <p>Delay time picks how long the echo waits, in musical lengths such as a dotted eighth. Feedback is how much of the echo is sent back in, from 20 to 88. Higher is wetter. It will not be pushed past 75 by Autopilot, so it does not turn into noise.</p>
   <p>Cutoff is the filter, in hertz. Lower sounds darker, higher sounds brighter. It starts at 680. Autopilot nudges it by about 20 hertz. Interpolate makes the filter glide. Turn it off and the filter jumps.</p>
@@ -177,7 +177,7 @@
 
   <section class="panel">
     <h2>Chord shapes</h2>
-    <p class="hint">The stab is one of seven chords: Open 5, Minor 7, High 5, Minor, Sus, Minor 9, and Major. This grid is a Markov chain. A row is the chord playing now. A column is the chord that can follow it. Drag a cell from 0 to 100. The next bar is chosen from that row, and a brighter cell is more likely. The last two rows start empty, and the chain loops through the rows above them. The sound stays the original three shapes. An empty row is skipped.</p>
+    <p class="hint">The stab is one of seven chords: Open 5, Minor 7, High 5, Minor, Sus, Minor 9, and Major. This grid is a Markov chain. A row is the chord playing now. A column is the chord that can follow it. Drag a cell from 0 to 100. The next bar is chosen from that row, and a brighter cell is more likely. Sus, Minor 9, and Major start empty, and the chain loops through the rows above them. The sound stays the original three shapes. An empty row is skipped.</p>
     <div id="markov" class="markov"></div>
   </section>
 

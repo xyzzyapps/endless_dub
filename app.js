@@ -16,7 +16,7 @@ const SHAPES = [
 function defaultMarkov() {
   const n = SHAPES.length;
   const grid = Array.from({ length: n }, () => Array(n).fill(0));
-  const live = n - 2;
+  const live = n - 3;
   for (let i = 0; i < live; i++) grid[i][(i + 1) % live] = 100;
   return grid;
 }
