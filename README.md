@@ -12,6 +12,8 @@ The lean-back session — step grids, autopilot, one-button regenerate — follo
 
 Live: https://xyzzyapps.github.io/endless_dub/
 
+Support on https://xyzzy.gumroad.com/
+
 ## Assumptions
 
 The starting pattern, the step weights, and the knob positions are the visible assumptions. The generator also has rules that stay in effect after those are edited.
