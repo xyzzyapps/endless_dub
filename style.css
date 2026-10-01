@@ -274,12 +274,39 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 
 .step-hint { margin: 0 0 8px; }
 
+.top-menu {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  z-index: 7;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+#help {
+  width: min(640px, calc(100vw - 28px));
+  max-height: min(78vh, 720px);
+  overflow: auto;
+  margin: auto;
+  padding: 16px 18px 20px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 0 24px rgba(var(--accent-rgb), 0.25);
+}
+#help::backdrop { background: rgba(0, 0, 0, 0.55); }
+.help-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.help-actions { display: flex; gap: 8px; align-items: center; }
+#help h2 { margin: 0; }
+#help h3 { margin: 16px 0 0; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+#help p { margin: 8px 0 0; color: var(--ink); font-size: 13px; line-height: 1.45; }
 #account {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 6;
+  padding-right: 92px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
@@ -359,6 +386,9 @@ button.recording { background: #ff5d5d; border-color: #ffb4b4; }
 }
 
 .pairs { display: flex; flex-wrap: wrap; gap: 12px 16px; }
+.pair { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.mute { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+.pair.muted h3, .pair.muted .faders { opacity: 0.4; }
 .pair h3 {
   margin: 0 0 6px;
   font-size: 11px;
@@ -422,15 +452,20 @@ canvas {
 footer { margin-top: 18px; color: var(--dim); font-size: 12px; }
 footer a { color: var(--accent); }
 
-.show-ui {
-  display: none;
-  position: fixed;
-  top: calc(58px + env(safe-area-inset-top));
-  right: calc(14px + env(safe-area-inset-right));
-  z-index: 6;
-}
+.show-ui { display: none; }
 body.plate-only .app { display: none; }
 body.plate-only .show-ui { display: inline-block; }
+body.plate-only #account,
+body.plate-only .top-menu {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s linear;
+}
+body.plate-only.reveal #account,
+body.plate-only.reveal .top-menu {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 @media (max-width: 720px) {
   .panel.two { grid-template-columns: 1fr; }
@@ -444,12 +479,11 @@ body.plate-only .show-ui { display: inline-block; }
     flex-direction: column;
     align-items: stretch;
     padding-left: calc(12px + env(safe-area-inset-left));
-    padding-right: calc(12px + env(safe-area-inset-right));
+    padding-right: calc(92px + env(safe-area-inset-right));
   }
   #accountStatus { overflow-wrap: anywhere; }
   #email, #password { width: 100%; min-width: 0; box-sizing: border-box; }
   .account-row { width: 100%; }
   .account-row button { flex: 1; }
   .app { padding-top: calc(210px + env(safe-area-inset-top)); }
-  .show-ui { top: calc(200px + env(safe-area-inset-top)); }
 }

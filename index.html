@@ -26,7 +26,35 @@
 </head>
 <body>
 <canvas id="plate" width="480" height="270"></canvas>
-<button id="showUi" type="button" class="ghost show-ui">Show player</button>
+<div class="top-menu">
+  <button id="showUi" type="button" class="ghost show-ui">Show player</button>
+  <button id="helpOpen" type="button" class="ghost">Help</button>
+</div>
+<dialog id="help">
+  <div class="help-head">
+    <h2>What this session does</h2>
+    <button id="helpClose" type="button" class="ghost">Close</button>
+  </div>
+  <p>Press Play and leave it. The grid is the current loop. Autopilot keeps the loop in the same dub, changing small things over many bars.</p>
+  <h3>Transport</h3>
+  <p>Play starts the audio. Space does the same when you are not typing in a field. Record writes a wav of the mix and a 25 fps video of the plate, and stops at 30 minutes. Plate only hides the controls and the top bar, and leaves the figure. Hover or tap the top edge to bring the bar back. Show player sits there next to Help. Color restyles the whole terminal. Blue, matrix green, amber, and dub grey are presets. A grey pick stays grey.</p>
+  <h3>Tempo, swing, root, chord</h3>
+  <p>BPM is beats per minute, from 112 to 132, and starts at 122. Swing is 0 to 100 and only moves the hats. The root is the key. The session starts on D. The sub and the plate stay on that root when the chord changes.</p>
+  <p>The chord menu names the minor-key neighbours of the root: the minor chord, minor 9, and sus on the root, then iv, v, VI, VII, and III. Picking one transposes the stab. It does not build a new stack of notes for that quality. Minor 9 and sus on the root are the same transposition as the root, so they sound the same as staying put.</p>
+  <p>The stab itself is three open shapes, one per bar, in a fixed order: a fifth with a high minor third and a 9th, then a minor 7 with an 11th, then a fifth with a 9th and a high fifth. A chord change keeps that cycle and shifts it.</p>
+  <h3>Harmonise</h3>
+  <p>Chord changes were already harmonic. New chord and autopilot only ever used six intervals inside the key: the root, a fourth, a minor sixth, a minor third, a whole step down, and a fifth. Harmonise on keeps that. Harmonise off is the new part: a new chord may start on any of the twelve pitches, including notes outside the key. The checkbox starts on.</p>
+  <h3>Pattern</h3>
+  <p>New pattern rebuilds the grid from fixed pools. The kick only lands on the four downbeats. Step 1 of the closed hat stays empty. The snare prefers the backbeat. The open hat, rim, sub, chord, and plate each draw from a short list of steps. Clear sets every hit and every step weight to zero.</p>
+  <p>Each cell has a weight from 0 to 100, drawn as brightness. Drag a cell up or down to change it. Click to toggle the hit. Zero is never chosen when a pattern is generated. A weight of 100 on the first kick or on snare steps 5 and 13 keeps those hits in place when autopilot mutates the pattern. A weight of 0 lets mutation turn them off.</p>
+  <h3>Knobs</h3>
+  <p>Each part has a Mute switch: kick, hi-hat, open hat, snare, rim, sub, chord, and plate. Mute stops new hits from that part and leaves the volume slider where it is. Note lengths are milliseconds. Cutoff is hertz, from 180 to 2400, starting at 680. Interpolate glides the filter toward a new target. With it off, the filter jumps. Feedback is the percent sent back around the delay, from 20 to 88, starting at 70. Autopilot will not push feedback above 75. Delay time is a note division, not a 0–100 slider.</p>
+  <p>Volume, delay send, reverb, drive, width, resonance, damp, tension, modes, and the autopilot sliders are 0 to 100 across the range that knob already had. The plate voice starts at 0, so the figure moves and the plate is silent until you raise it. Low frequencies push the wide modes of the figure. Highs push the fine ones.</p>
+  <h3>Autopilot</h3>
+  <p>Each ticked row may drift. The slider under it is how far, from 0 to 100. Every 8 bars the ticked knobs sway. Pattern and chord are considered every 16 bars. Muteouts, which drop the drums for four bars, are considered every 32. Levels, note length, root, tempo, delay time, drive, and plate tension stay where you set them. Feedback's own slider starts at 25, so its drift stays small.</p>
+  <h3>Account</h3>
+  <p>Sign in with email and password to save the grid, the weights, the color, the switches, and the knobs. Share copies a link with that song's id. A song saved before the color and switches were stored needs to be saved again.</p>
+</dialog>
 <section class="panel" id="account">
   <p id="accountStatus" class="hint"></p>
   <div class="account-row" id="signedOut">
@@ -68,7 +96,7 @@
       <button type="button" class="swatch" data-color="#b5b5b5" title="Dub grey" style="background:#b5b5b5"></button>
     </span>
     <label class="readout">BPM <input id="bpm" type="range" min="112" max="132" step="1" value="122"><span id="bpmVal">122</span></label>
-    <label class="readout">Swing <input id="swing" type="range" min="0" max="40" step="1" value="14"><span id="swingVal">14</span></label>
+    <label class="readout">Swing <input id="swing" type="range" min="0" max="100" step="1" value="35"><span id="swingVal">35</span></label>
     <label class="readout">Root
       <select id="root">
         <option value="0">C</option>
@@ -85,7 +113,11 @@
         <option value="11">B</option>
       </select>
     </label>
-    <div class="readout static"><span id="keyName">D minor</span><span id="barCount">bar 1</span></div>
+    <label class="readout">Chord
+      <select id="chordPick"></select>
+    </label>
+    <label class="toggle"><input id="harmonise" type="checkbox" checked> Harmonise</label>
+    <div class="readout static"><span id="barCount">bar 1</span></div>
     <label class="toggle"><input id="autopilot" type="checkbox" checked> Autopilot</label>
     <span class="pattern-actions">
       <button id="regen" type="button" class="ghost">New pattern</button>
@@ -97,50 +129,50 @@
   <section class="panel">
     <h2>Volume × length</h2>
     <div class="pairs">
-      <div class="pair"><h3>Kick</h3><div class="knobs faders">
+      <div class="pair"><h3>Kick</h3><label class="mute"><input id="muteKick" type="checkbox"> Mute</label><div class="knobs faders">
         <label>Vol <input id="kickLvl" type="range" min="0" max="100" step="1" value="100"><span id="kickVal">100</span></label>
         <label>Len <input id="kickLen" type="range" min="40" max="900" step="1" value="420"><span id="kickLenVal">420</span></label>
       </div></div>
-      <div class="pair"><h3>Hi-hat</h3><div class="knobs faders">
+      <div class="pair"><h3>Hi-hat</h3><label class="mute"><input id="muteHat" type="checkbox"> Mute</label><div class="knobs faders">
         <label>Vol <input id="hatLvl" type="range" min="0" max="100" step="1" value="100"><span id="hatVal">100</span></label>
         <label>Len <input id="hatLen" type="range" min="8" max="180" step="1" value="30"><span id="hatLenVal">30</span></label>
       </div></div>
-      <div class="pair"><h3>Open</h3><div class="knobs faders">
+      <div class="pair"><h3>Open</h3><label class="mute"><input id="muteOpen" type="checkbox"> Mute</label><div class="knobs faders">
         <label>Vol <input id="openLvl" type="range" min="0" max="100" step="1" value="85"><span id="openVal">85</span></label>
         <label>Len <input id="openLen" type="range" min="40" max="800" step="1" value="220"><span id="openLenVal">220</span></label>
       </div></div>
-      <div class="pair"><h3>Snare</h3><div class="knobs faders">
+      <div class="pair"><h3>Snare</h3><label class="mute"><input id="muteSnare" type="checkbox"> Mute</label><div class="knobs faders">
         <label>Vol <input id="snareLvl" type="range" min="0" max="100" step="1" value="100"><span id="snareVal">100</span></label>
         <label>Len <input id="snareLen" type="range" min="40" max="600" step="1" value="140"><span id="snareLenVal">140</span></label>
       </div></div>
-      <div class="pair"><h3>Rim</h3><div class="knobs faders">
+      <div class="pair"><h3>Rim</h3><label class="mute"><input id="muteRim" type="checkbox"> Mute</label><div class="knobs faders">
         <label>Vol <input id="rimLvl" type="range" min="0" max="100" step="1" value="100"><span id="rimVal">100</span></label>
         <label>Len <input id="rimLen" type="range" min="20" max="400" step="1" value="70"><span id="rimLenVal">70</span></label>
       </div></div>
-      <div class="pair"><h3>Sub</h3><div class="knobs faders">
+      <div class="pair"><h3>Sub</h3><label class="mute"><input id="muteBass" type="checkbox"> Mute</label><div class="knobs faders">
         <label>Vol <input id="bassLvl" type="range" min="0" max="100" step="1" value="78"><span id="bassVal">78</span></label>
         <label>Len <input id="bassLen" type="range" min="80" max="1600" step="1" value="550"><span id="bassLenVal">550</span></label>
       </div></div>
-      <div class="pair"><h3>Chord</h3><div class="knobs faders">
+      <div class="pair"><h3>Chord</h3><label class="mute"><input id="muteStab" type="checkbox"> Mute</label><div class="knobs faders">
         <label>Vol <input id="stabLvl" type="range" min="0" max="100" step="1" value="100"><span id="stabVal">100</span></label>
         <label>Len <input id="decay" type="range" min="80" max="900" step="1" value="280"><span id="decayVal">280</span></label>
       </div></div>
-      <div class="pair"><h3>Plate</h3><div class="knobs faders">
+      <div class="pair"><h3>Plate</h3><label class="mute"><input id="mutePlate" type="checkbox"> Mute</label><div class="knobs faders">
         <label>Vol <input id="plateLvl" type="range" min="0" max="100" step="1" value="0"><span id="plateVal">0</span></label>
         <label>Len <input id="ring" type="range" min="200" max="4200" step="1" value="1800"><span id="ringVal">1800</span></label>
       </div></div>
     </div>
   </section>
 
-  <p class="hint step-hint">Each step has its own weight, shown as brightness. Drag that step up or down to change it. A click toggles the hit. Brighter steps are more likely to be chosen when that drum's pattern is generated.</p>
+  <p class="hint step-hint">Each step has its own weight from 0 to 100, shown as brightness. Drag that step up or down to change it. A click toggles the hit. 100 is the most likely, and 0 is never chosen when that drum's pattern is generated.</p>
   <section class="grids" id="grids"></section>
 
   <section class="panel">
     <h2>Cymatics plate</h2>
     <p class="hint">The figure behind the session is the plate. Low frequencies push the wide modes, highs push the fine ones, and the whole pattern brightens with the level of the mix.</p>
     <div class="knobs">
-      <label>Tension <input id="tension" type="range" min="40" max="220" step="1" value="100"><span id="tensionVal">1.00</span></label>
-      <label>Modes <input id="order" type="range" min="2" max="10" step="1" value="6"><span id="orderVal">6</span></label>
+      <label>Tension <input id="tension" type="range" min="0" max="100" step="1" value="33"><span id="tensionVal">33</span></label>
+      <label>Modes <input id="order" type="range" min="0" max="100" step="1" value="50"><span id="orderVal">50</span></label>
     </div>
   </section>
 
@@ -150,7 +182,7 @@
       <label>Cutoff <input id="cutoff" type="range" min="180" max="2400" step="1" value="680"><span id="cutoffVal">680</span>
         <span class="subcheck"><input id="cutoffGlide" type="checkbox" checked> Interpolate</span>
       </label>
-      <label>Reso <input id="reso" type="range" min="0" max="18" step="0.1" value="6"><span id="resoVal">6.0</span></label>
+      <label>Reso <input id="reso" type="range" min="0" max="100" step="1" value="33"><span id="resoVal">33</span></label>
       <label>Delay send <input id="send" type="range" min="0" max="100" step="1" value="62"><span id="sendVal">62</span></label>
     </div>
   </section>
@@ -169,7 +201,7 @@
           </select>
         </label>
         <label>Feedback <input id="feedback" type="range" min="20" max="88" step="1" value="70"><span id="feedbackVal">70</span></label>
-        <label>Damp <input id="damp" type="range" min="400" max="5000" step="1" value="1400"><span id="dampVal">1400</span></label>
+        <label>Damp <input id="damp" type="range" min="0" max="100" step="1" value="22"><span id="dampVal">22</span></label>
       </div>
     </div>
     <div>

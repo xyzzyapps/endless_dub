@@ -25,8 +25,11 @@ const state = {
   bar: 0,
   step: 0,
   nextTime: 0,
-  root: 50, // D3, chord register
-  degree: 0,
+  root: 50, // D3, key register
+  chord: "i",
+  freeSemi: 0,
+  freeQuality: "min",
+  harmonise: true,
   holdBars: 0,
   minHold: 16,
   breakdown: 0,
@@ -44,6 +47,7 @@ const state = {
   srs: 0.68,
   color: { hex: "#3ec2ff", r: 62, g: 194, b: 255 },
   lvl: { kick: 1, hat: 1, open: 0.85, snare: 1, rim: 1, stab: 1, plate: 0 },
+  mute: { kick: false, hat: false, open: false, snare: false, rim: false, bass: false, stab: false, plate: false },
   len: { kick: 0.42, hat: 0.03, open: 0.22, snare: 0.14, rim: 0.07, bass: 0.55 },
   plate: { tension: 1, ring: 1.8, order: 6 },
   drift: {
@@ -61,18 +65,18 @@ const state = {
     swing: true,
   },
   weight: {
-    cutoff: 1,
-    feedback: 0.25,
-    damp: 1,
-    reverb: 1,
-    decay: 1,
-    pattern: 1,
-    chord: 1,
-    breakdown: 1,
-    send: 1,
-    width: 1,
-    reso: 1,
-    swing: 1,
+    cutoff: 100,
+    feedback: 25,
+    damp: 100,
+    reverb: 100,
+    decay: 100,
+    pattern: 100,
+    chord: 100,
+    breakdown: 100,
+    send: 100,
+    width: 100,
+    reso: 100,
+    swing: 100,
   },
   stepWeight: {},
   cutoffGlide: true,
@@ -111,13 +115,58 @@ function midiToHz(m) {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
 
-function chordName() {
-  const name = NOTES[((state.root % 12) + 12) % 12];
-  const flavors = ["minor", "minor", "sus", "minor 9"];
-  return name + " " + flavors[Math.abs(state.degree) % flavors.length];
+// Natural-minor neighbours of the selected root. semi is the interval from the key.
+const HARMONY = [
+  { id: "i", semi: 0, quality: "min", label: "minor" },
+  { id: "i9", semi: 0, quality: "min9", label: "minor 9" },
+  { id: "isus", semi: 0, quality: "sus", label: "sus" },
+  { id: "iv", semi: 5, quality: "min", label: "minor" },
+  { id: "v", semi: 7, quality: "min", label: "minor" },
+  { id: "VI", semi: 8, quality: "maj", label: "major" },
+  { id: "VII", semi: -2, quality: "maj", label: "major" },
+  { id: "III", semi: 3, quality: "maj", label: "major" },
+];
+
+function harmonyById(id) {
+  return HARMONY.find((c) => c.id === id) || HARMONY[0];
 }
 
-const STEP_CURVE = [1, 0.35, 0.55, 0.3, 0.85, 0.4, 0.6, 0.3, 0.9, 0.35, 0.55, 0.3, 0.85, 0.4, 0.7, 0.3];
+function currentChord() {
+  if (state.chord !== "free") {
+    const c = harmonyById(state.chord);
+    return { semi: c.semi, quality: c.quality, id: c.id };
+  }
+  return { semi: state.freeSemi, quality: state.freeQuality, id: "free" };
+}
+
+function chordName() {
+  const chord = currentChord();
+  const pc = ((state.root + chord.semi) % 12 + 12) % 12;
+  const labels = { min: "minor", min9: "minor 9", sus: "sus", maj: "major" };
+  return NOTES[pc] + " " + (labels[chord.quality] || "minor");
+}
+
+function fillChordSelect() {
+  const sel = $("chordPick");
+  if (!sel) return;
+  const pc = ((state.root % 12) + 12) % 12;
+  sel.innerHTML = "";
+  HARMONY.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = NOTES[((pc + c.semi) % 12 + 12) % 12] + " " + c.label;
+    sel.appendChild(opt);
+  });
+  if (state.chord === "free") {
+    const opt = document.createElement("option");
+    opt.value = "free";
+    opt.textContent = chordName();
+    sel.appendChild(opt);
+  }
+  sel.value = state.chord;
+}
+
+const STEP_CURVE = [100, 35, 55, 30, 85, 40, 60, 30, 90, 35, 55, 30, 85, 40, 70, 30];
 
 function fillStepWeights() {
   ROWS.forEach((row) => {
@@ -125,39 +174,49 @@ function fillStepWeights() {
   });
 }
 
+function stepPct(voice, step) {
+  return state.stepWeight[voice][step] / 100;
+}
+
 function hit(voice, step, base) {
-  return Math.random() < base * state.stepWeight[voice][step];
+  return Math.random() < base * stepPct(voice, step);
 }
 
 function pickWeighted(voice, pool) {
   let total = 0;
-  for (let i = 0; i < pool.length; i++) total += Math.max(0.04, state.stepWeight[voice][pool[i]]);
+  for (let i = 0; i < pool.length; i++) total += state.stepWeight[voice][pool[i]];
+  if (total <= 0) return -1;
   let r = Math.random() * total;
   for (let i = 0; i < pool.length; i++) {
-    r -= Math.max(0.04, state.stepWeight[voice][pool[i]]);
+    r -= state.stepWeight[voice][pool[i]];
     if (r <= 0) return pool[i];
   }
   return pool[pool.length - 1];
 }
 
+function place(pattern, voice, pool) {
+  const i = pickWeighted(voice, pool);
+  if (i >= 0) pattern[i] = 1;
+}
+
 function makePattern() {
   const kick = Array.from({ length: 16 }, (_, i) => (i % 4 === 0 && hit("kick", i, 0.95) ? 1 : 0));
-  if (!kick.some((v) => v)) kick[pickWeighted("kick", [0, 4, 8, 12])] = 1;
+  if (!kick.some((v) => v)) place(kick, "kick", [0, 4, 8, 12]);
 
   const hat = Array.from({ length: 16 }, (_, i) => (hit("hat", i, i % 2 === 0 ? 0.35 : 0.72) ? 1 : 0));
   hat[0] = 0;
 
   const open = Array(16).fill(0);
-  open[pickWeighted("open", [6, 10, 14])] = 1;
+  place(open, "open", [6, 10, 14]);
   if (Math.random() < 0.35) {
     const extra = pickWeighted("open", [6, 10, 14]);
-    if (hit("open", extra, 1)) open[extra] = 1;
+    if (extra >= 0 && hit("open", extra, 1)) open[extra] = 1;
   }
 
   const snare = Array(16).fill(0);
   if (hit("snare", 4, 0.95)) snare[4] = 1;
   if (hit("snare", 12, 0.95)) snare[12] = 1;
-  if (!snare[4] && !snare[12]) snare[pickWeighted("snare", [4, 12])] = 1;
+  if (!snare[4] && !snare[12]) place(snare, "snare", [4, 12]);
   if (hit("snare", 13, 0.3)) snare[13] = 1;
 
   const perc = Array(16).fill(0);
@@ -168,25 +227,24 @@ function makePattern() {
   const bass = Array(16).fill(0);
   if (hit("bass", 0, 1)) bass[0] = 1;
   const off = pickWeighted("bass", [6, 7, 10, 14]);
-  if (hit("bass", off, 0.85)) bass[off] = 1;
+  if (off >= 0 && hit("bass", off, 0.85)) bass[off] = 1;
   if (hit("bass", 8, 0.4)) bass[8] = 1;
-  if (!bass.some((v) => v)) bass[0] = 1;
+  if (!bass.some((v) => v)) place(bass, "bass", [0]);
 
   const stab = Array(16).fill(0);
   const candidates = [3, 6, 7, 10, 11, 14];
   const hits = 2 + Math.floor(Math.random() * 2);
   for (let n = 0; n < hits; n++) {
     const i = pickWeighted("stab", candidates);
-    if (hit("stab", i, 0.9)) stab[i] = 1;
+    if (i >= 0 && hit("stab", i, 0.9)) stab[i] = 1;
   }
-  if (!stab.some((v) => v)) stab[pickWeighted("stab", candidates)] = 1;
+  if (!stab.some((v) => v)) place(stab, "stab", candidates);
 
   const plate = Array(16).fill(0);
-  const plateAt = pickWeighted("plate", [2, 7, 10, 11, 15]);
-  plate[plateAt] = 1;
+  place(plate, "plate", [2, 7, 10, 11, 15]);
   if (Math.random() < 0.4) {
     const extra = pickWeighted("plate", [2, 7, 10, 11, 15]);
-    if (hit("plate", extra, 0.8)) plate[extra] = 1;
+    if (extra >= 0 && hit("plate", extra, 0.8)) plate[extra] = 1;
   }
 
   state.patterns = { kick, hat, open, snare, perc, bass, stab, plate };
@@ -219,7 +277,8 @@ function renderGrids() {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "step " + row.cls + (on ? " on" : "") + (i % 4 === 0 ? " downbeat" : "");
-      b.style.setProperty("--step-w", String(state.stepWeight[row.id][i]));
+      b.style.setProperty("--step-w", stepPct(row.id, i).toFixed(3));
+      b.title = Math.round(state.stepWeight[row.id][i]) + " / 100";
       let drag = null;
       b.addEventListener("pointerdown", (e) => {
         drag = { y: e.clientY, moved: false, w: state.stepWeight[row.id][i] };
@@ -230,8 +289,9 @@ function renderGrids() {
         const dy = drag.y - e.clientY;
         if (Math.abs(dy) > 4) drag.moved = true;
         if (!drag.moved) return;
-        state.stepWeight[row.id][i] = clamp(drag.w + dy / 72, 0, 1);
-        b.style.setProperty("--step-w", state.stepWeight[row.id][i].toFixed(3));
+        state.stepWeight[row.id][i] = clamp(drag.w + dy / 0.72, 0, 100);
+        b.style.setProperty("--step-w", (state.stepWeight[row.id][i] / 100).toFixed(3));
+        b.title = Math.round(state.stepWeight[row.id][i]) + " / 100";
       });
       b.addEventListener("pointerup", () => {
         if (drag && !drag.moved) {
@@ -251,7 +311,8 @@ function paintWeights() {
   document.querySelectorAll(".row").forEach((rowEl, r) => {
     const id = ROWS[r].id;
     rowEl.querySelectorAll(".step").forEach((step, i) => {
-      step.style.setProperty("--step-w", state.stepWeight[id][i].toFixed(3));
+      step.style.setProperty("--step-w", (state.stepWeight[id][i] / 100).toFixed(3));
+      step.title = Math.round(state.stepWeight[id][i]) + " / 100";
     });
   });
 }
@@ -262,7 +323,8 @@ function paintGrids() {
     const id = ROWS[r].id;
     rowEl.querySelectorAll(".step").forEach((step, i) => {
       step.classList.toggle("on", !!state.patterns[id][i]);
-      step.style.setProperty("--step-w", state.stepWeight[id][i].toFixed(3));
+      step.style.setProperty("--step-w", (state.stepWeight[id][i] / 100).toFixed(3));
+      step.title = Math.round(state.stepWeight[id][i]) + " / 100";
     });
   });
 }
@@ -384,11 +446,11 @@ function playBass(t, step) {
 }
 
 function stabNotes() {
-  const r = state.root + state.degree;
-  const roll = (state.bar + state.degree) % 3;
-  if (roll === 0) return [r, r + 7, r + 15, r + 14]; // sus-ish open + 9th
-  if (roll === 1) return [r, r + 3, r + 10, r + 19]; // m7 spread, 11th
-  return [r, r + 7, r + 15, r + 26]; // fifth + 9 + high 5th
+  const r = state.root + currentChord().semi;
+  const roll = (state.bar + currentChord().semi) % 3;
+  if (roll === 0) return [r, r + 7, r + 15, r + 14];
+  if (roll === 1) return [r, r + 3, r + 10, r + 19];
+  return [r, r + 7, r + 15, r + 26];
 }
 
 function playStab(t) {
@@ -611,14 +673,15 @@ function playPlate(t) {
 function playStep(step, t) {
   const p = state.patterns;
   const broken = state.breakdown > 0;
-  if (p.kick[step] && !broken) playKick(t);
-  if (p.hat[step] && Math.random() < (broken ? 0.45 : 0.92)) playHat(t, false);
-  if (p.open[step] && Math.random() < (broken ? 0.4 : 1)) playHat(t, true);
-  if (p.snare[step] && !broken) playSnare(t);
-  if (p.perc[step] && !broken) playRim(t);
-  if (p.bass[step] && !broken) playBass(t, step);
-  if (p.stab[step]) playStab(t);
-  if (p.plate[step]) playPlate(t);
+  const muted = state.mute;
+  if (p.kick[step] && !broken && !muted.kick) playKick(t);
+  if (p.hat[step] && !muted.hat && Math.random() < (broken ? 0.45 : 0.92)) playHat(t, false);
+  if (p.open[step] && !muted.open && Math.random() < (broken ? 0.4 : 1)) playHat(t, true);
+  if (p.snare[step] && !broken && !muted.snare) playSnare(t);
+  if (p.perc[step] && !broken && !muted.rim) playRim(t);
+  if (p.bass[step] && !broken && !muted.bass) playBass(t, step);
+  if (p.stab[step] && !muted.stab) playStab(t);
+  if (p.plate[step] && !muted.plate) playPlate(t);
 }
 
 function onBar() {
@@ -632,14 +695,14 @@ function onBar() {
     const d = state.drift;
     const w = state.weight;
     const sway = (span) => (Math.random() * 2 - 1) * span;
-    if (d.feedback) state.feedback = clamp(state.feedback + sway(0.02 * w.feedback), 0.45, 0.75);
-    if (d.damp) state.damp = clamp(state.damp + sway(350 * w.damp), 500, 4200);
-    if (d.reverb) state.reverb = clamp(state.reverb + sway(0.08 * w.reverb), 0.05, 0.8);
-    if (d.decay) state.decay = clamp(state.decay + sway(0.08 * w.decay), 0.09, 0.8);
-    if (d.send) state.send = clamp(state.send + sway(0.06 * w.send), 0.15, 0.9);
-    if (d.width) state.srs = clamp(state.srs + sway(0.08 * w.width), 0.15, 0.9);
-    if (d.reso) state.reso = clamp(state.reso + sway(2.5 * w.reso), 0, 14);
-    if (d.swing) state.swing = clamp(state.swing + sway(0.04 * w.swing), 0, 0.4);
+    if (d.feedback) state.feedback = clamp(state.feedback + sway(0.02 * w.feedback / 100), 0.45, 0.75);
+    if (d.damp) state.damp = clamp(state.damp + sway(350 * w.damp / 100), 500, 4200);
+    if (d.reverb) state.reverb = clamp(state.reverb + sway(0.08 * w.reverb / 100), 0.05, 0.8);
+    if (d.decay) state.decay = clamp(state.decay + sway(0.08 * w.decay / 100), 0.09, 0.8);
+    if (d.send) state.send = clamp(state.send + sway(0.06 * w.send / 100), 0.15, 0.9);
+    if (d.width) state.srs = clamp(state.srs + sway(0.08 * w.width / 100), 0.15, 0.9);
+    if (d.reso) state.reso = clamp(state.reso + sway(2.5 * w.reso / 100), 0, 14);
+    if (d.swing) state.swing = clamp(state.swing + sway(0.04 * w.swing / 100), 0, 0.4);
     syncControls();
     applyParams();
   }
@@ -647,56 +710,72 @@ function onBar() {
     mutatePattern();
     paintGrids();
   }
-  if (state.drift.chord && state.weight.chord > 0 && state.holdBars >= state.minHold && state.bar % 16 === 0 && Math.random() < 0.65 * state.weight.chord) {
+  if (state.drift.chord && state.weight.chord > 0 && state.holdBars >= state.minHold && state.bar % 16 === 0 && Math.random() < 0.65 * state.weight.chord / 100) {
     shiftChord();
   }
-  if (state.drift.breakdown && state.weight.breakdown > 0 && state.bar % 32 === 0 && Math.random() < 0.7 * state.weight.breakdown) {
+  if (state.drift.breakdown && state.weight.breakdown > 0 && state.bar % 32 === 0 && Math.random() < 0.7 * state.weight.breakdown / 100) {
     state.breakdown = 4;
   }
 }
 
 function mutatePattern() {
-  const w = state.weight.pattern;
+  const w = state.weight.pattern / 100;
   const hat = state.patterns.hat;
   if (Math.random() < w) {
     const i = pickWeighted("hat", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
-    hat[i] = hat[i] ? 0 : 1;
+    if (i >= 0) hat[i] = hat[i] ? 0 : 1;
   }
   if (Math.random() < 0.4 * w) {
     const open = state.patterns.open;
     const idx = pickWeighted("open", [2, 6, 10, 14]);
-    open[idx] = open[idx] ? 0 : 1;
-    if (open.reduce((a, b) => a + b, 0) > 3) open[idx] = 0;
+    if (idx >= 0) {
+      open[idx] = open[idx] ? 0 : 1;
+      if (open.reduce((a, b) => a + b, 0) > 3) open[idx] = 0;
+    }
   }
   const stab = state.patterns.stab;
   if (Math.random() < 0.5 * w) {
     const idx = pickWeighted("stab", [3, 6, 7, 10, 11, 14]);
-    stab[idx] = stab[idx] ? 0 : 1;
-    if (stab.reduce((a, b) => a + b, 0) < 2) stab[pickWeighted("stab", [3, 6, 10, 14])] = 1;
-    if (stab.reduce((a, b) => a + b, 0) > 4) stab[idx] = 0;
+    if (idx >= 0) {
+      stab[idx] = stab[idx] ? 0 : 1;
+      if (stab.reduce((a, b) => a + b, 0) < 2) place(stab, "stab", [3, 6, 10, 14]);
+      if (stab.reduce((a, b) => a + b, 0) > 4) stab[idx] = 0;
+    }
   }
   const kick = state.patterns.kick;
-  if (Math.random() < 0.4 * w) kick[8] = kick[8] ? 0 : 1;
-  kick[0] = 1;
+  if (Math.random() < 0.4 * w * stepPct("kick", 8)) kick[8] = kick[8] ? 0 : 1;
+  if (stepPct("kick", 0) >= 1) kick[0] = 1;
+  else if (stepPct("kick", 0) <= 0) kick[0] = 0;
   const snare = state.patterns.snare;
-  snare[4] = 1;
-  snare[12] = 1;
-  if (Math.random() < 0.35 * w * state.stepWeight.snare[13]) snare[13] = snare[13] ? 0 : 1;
+  if (stepPct("snare", 4) >= 1) snare[4] = 1;
+  else if (stepPct("snare", 4) <= 0) snare[4] = 0;
+  if (stepPct("snare", 12) >= 1) snare[12] = 1;
+  else if (stepPct("snare", 12) <= 0) snare[12] = 0;
+  if (Math.random() < 0.35 * w * stepPct("snare", 13)) snare[13] = snare[13] ? 0 : 1;
   if (Math.random() < 0.45 * w) {
     const plate = state.patterns.plate;
     const idx = pickWeighted("plate", [2, 7, 10, 11, 15]);
-    plate[idx] = plate[idx] ? 0 : 1;
-    if (plate.reduce((a, b) => a + b, 0) > 2) plate[idx] = 0;
-    if (plate.reduce((a, b) => a + b, 0) === 0) plate[10] = 1;
+    if (idx >= 0) {
+      plate[idx] = plate[idx] ? 0 : 1;
+      if (plate.reduce((a, b) => a + b, 0) > 2) plate[idx] = 0;
+    }
+    if (plate.reduce((a, b) => a + b, 0) === 0) place(plate, "plate", [2, 7, 10, 11, 15]);
   }
 }
 
 function shiftChord() {
-  const moves = [0, 5, 8, 3, -2, 7];
-  state.degree = moves[Math.floor(Math.random() * moves.length)];
+  if (state.harmonise) {
+    const pool = HARMONY.filter((c) => c.id !== state.chord);
+    state.chord = pool[Math.floor(Math.random() * pool.length)].id;
+  } else {
+    const qualities = ["min", "maj", "sus", "min9"];
+    state.freeSemi = Math.floor(Math.random() * 12);
+    state.freeQuality = qualities[Math.floor(Math.random() * qualities.length)];
+    state.chord = "free";
+  }
   state.holdBars = 0;
   state.minHold = 16 + Math.floor(Math.random() * 16);
-  $("keyName").textContent = chordName();
+  fillChordSelect();
 }
 
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -969,13 +1048,13 @@ function glideCutoff() {
   const dt = Math.min(0.1, Math.max(0.001, now - (state.cutoffStamp || now)));
   state.cutoffStamp = now;
   if (now >= state.cutoffRetarget) {
-    const span = 280 + 1700 * state.weight.cutoff;
+    const span = 280 + 1700 * state.weight.cutoff / 100;
     const lo = clamp(state.cutoff - span, 160, 2400);
     const hi = clamp(state.cutoff + span, 160, 2400);
     state.cutoffTarget = clamp(lo + Math.random() * Math.max(80, hi - lo), 160, 2400);
-    state.cutoffRetarget = now + 1.2 + Math.random() * (4.5 - state.weight.cutoff * 2);
+    state.cutoffRetarget = now + 1.2 + Math.random() * (4.5 - state.weight.cutoff / 100 * 2);
   }
-  const rate = 0.45 + state.weight.cutoff * 1.6;
+  const rate = 0.45 + state.weight.cutoff / 100 * 1.6;
   if (state.cutoffGlide) state.cutoff += (state.cutoffTarget - state.cutoff) * (1 - Math.exp(-dt * rate));
   else state.cutoff = state.cutoffTarget;
   if (now - state.cutoffUi > 0.08) {
@@ -1127,6 +1206,26 @@ function draw(now) {
   c.stroke();
 }
 
+// Slider positions are 0–100. These are the engine ranges behind them. BPM stays in beats.
+const RANGE = {
+  swing: [0, 0.4],
+  reso: [0, 18],
+  damp: [400, 5000],
+  tension: [0.4, 2.2],
+  order: [2, 10],
+};
+
+function fromPct(key, pct) {
+  const [lo, hi] = RANGE[key];
+  return lo + (clamp(Number(pct), 0, 100) / 100) * (hi - lo);
+}
+
+function toPct(key, value) {
+  const [lo, hi] = RANGE[key];
+  const t = (clamp(value, lo, hi) - lo) / (hi - lo);
+  return Math.round(t * 100);
+}
+
 function bindSlider(id, valId, read, write, fmt) {
   const el = $(id);
   const label = $(valId);
@@ -1139,32 +1238,34 @@ function bindSlider(id, valId, read, write, fmt) {
 }
 
 function syncControls() {
+  const show = (id, key, value) => {
+    const pct = toPct(key, value);
+    $(id).value = pct;
+    $(id + "Val").textContent = String(pct);
+  };
+  show("damp", "damp", state.damp);
+  show("reso", "reso", state.reso);
   $("cutoff").value = Math.round(state.cutoff);
-  $("cutoffVal").textContent = Math.round(state.cutoff);
+  $("cutoffVal").textContent = String(Math.round(state.cutoff));
   $("feedback").value = Math.round(state.feedback * 100);
-  $("feedbackVal").textContent = Math.round(state.feedback * 100);
-  $("damp").value = Math.round(state.damp);
-  $("dampVal").textContent = Math.round(state.damp);
+  $("feedbackVal").textContent = String(Math.round(state.feedback * 100));
+  $("decay").value = Math.round(state.decay * 1000);
+  $("decayVal").textContent = String(Math.round(state.decay * 1000));
+  show("swing", "swing", state.swing);
   $("reverb").value = Math.round(state.reverb * 100);
   $("reverbVal").textContent = Math.round(state.reverb * 100);
-  $("decay").value = Math.round(state.decay * 1000);
-  $("decayVal").textContent = Math.round(state.decay * 1000);
   $("send").value = Math.round(state.send * 100);
   $("sendVal").textContent = Math.round(state.send * 100);
   $("srs").value = Math.round(state.srs * 100);
   $("srsVal").textContent = Math.round(state.srs * 100);
-  $("reso").value = state.reso.toFixed(1);
-  $("resoVal").textContent = state.reso.toFixed(1);
-  $("swing").value = Math.round(state.swing * 100);
-  $("swingVal").textContent = Math.round(state.swing * 100);
-  $("keyName").textContent = chordName();
+  fillChordSelect();
 }
 
 function wire() {
   fillStepWeights();
   seedPattern();
   renderGrids();
-  $("keyName").textContent = chordName();
+  fillChordSelect();
 
   $("cutoffGlide").addEventListener("change", () => { state.cutoffGlide = $("cutoffGlide").checked; });
   applyBase($("baseColor").value);
@@ -1194,7 +1295,7 @@ function wire() {
     applyParams();
   });
   $("swing").addEventListener("input", () => {
-    state.swing = Number($("swing").value) / 100;
+    state.swing = fromPct("swing", $("swing").value);
     $("swingVal").textContent = $("swing").value;
   });
   $("autopilot").addEventListener("change", () => {
@@ -1214,19 +1315,32 @@ function wire() {
   });
   $("root").addEventListener("change", () => {
     state.root = 48 + Number($("root").value);
-    $("keyName").textContent = chordName();
+    fillChordSelect();
+  });
+  $("chordPick").addEventListener("change", () => {
+    state.chord = $("chordPick").value;
+    if (state.chord === "free") return;
+    const picked = harmonyById(state.chord);
+    state.freeSemi = picked.semi;
+    state.freeQuality = picked.quality;
+  });
+  $("harmonise").addEventListener("change", () => {
+    state.harmonise = $("harmonise").checked;
   });
 
-  bindSlider("cutoff", "cutoffVal", (el) => Number(el.value), (v) => {
+  const pct = (key) => (el) => fromPct(key, el.value);
+  const asPct = (key) => (v) => String(toPct(key, v));
+  const ms = (el) => Number(el.value);
+  bindSlider("cutoff", "cutoffVal", ms, (v) => {
     state.cutoff = v;
     state.cutoffTarget = v;
     if (ctx) state.cutoffRetarget = ctx.currentTime + 2;
   }, (v) => String(Math.round(v)));
-  bindSlider("reso", "resoVal", (el) => Number(el.value), (v) => { state.reso = v; }, (v) => v.toFixed(1));
-  bindSlider("decay", "decayVal", (el) => Number(el.value), (v) => { state.decay = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("reso", "resoVal", pct("reso"), (v) => { state.reso = v; }, asPct("reso"));
+  bindSlider("decay", "decayVal", ms, (v) => { state.decay = v / 1000; }, (v) => String(Math.round(v)));
   bindSlider("send", "sendVal", (el) => Number(el.value), (v) => { state.send = v / 100; }, (v) => String(Math.round(v)));
-  bindSlider("feedback", "feedbackVal", (el) => Number(el.value), (v) => { state.feedback = v / 100; }, (v) => String(Math.round(v)));
-  bindSlider("damp", "dampVal", (el) => Number(el.value), (v) => { state.damp = v; }, (v) => String(Math.round(v)));
+  bindSlider("feedback", "feedbackVal", ms, (v) => { state.feedback = v / 100; }, (v) => String(Math.round(v)));
+  bindSlider("damp", "dampVal", pct("damp"), (v) => { state.damp = v; }, asPct("damp"));
   bindSlider("reverb", "reverbVal", (el) => Number(el.value), (v) => { state.reverb = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("bassLvl", "bassVal", (el) => Number(el.value), (v) => { state.bassLvl = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("kickLvl", "kickVal", (el) => Number(el.value), (v) => { state.lvl.kick = v / 100; }, (v) => String(Math.round(v)));
@@ -1236,15 +1350,21 @@ function wire() {
   bindSlider("rimLvl", "rimVal", (el) => Number(el.value), (v) => { state.lvl.rim = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("stabLvl", "stabVal", (el) => Number(el.value), (v) => { state.lvl.stab = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("plateLvl", "plateVal", (el) => Number(el.value), (v) => { state.lvl.plate = v / 100; }, (v) => String(Math.round(v)));
-  bindSlider("tension", "tensionVal", (el) => Number(el.value), (v) => { state.plate.tension = v / 100; }, (v) => (v / 100).toFixed(2));
-  bindSlider("ring", "ringVal", (el) => Number(el.value), (v) => { state.plate.ring = v / 1000; }, (v) => String(Math.round(v)));
-  bindSlider("kickLen", "kickLenVal", (el) => Number(el.value), (v) => { state.len.kick = v / 1000; }, (v) => String(Math.round(v)));
-  bindSlider("hatLen", "hatLenVal", (el) => Number(el.value), (v) => { state.len.hat = v / 1000; }, (v) => String(Math.round(v)));
-  bindSlider("openLen", "openLenVal", (el) => Number(el.value), (v) => { state.len.open = v / 1000; }, (v) => String(Math.round(v)));
-  bindSlider("snareLen", "snareLenVal", (el) => Number(el.value), (v) => { state.len.snare = v / 1000; }, (v) => String(Math.round(v)));
-  bindSlider("rimLen", "rimLenVal", (el) => Number(el.value), (v) => { state.len.rim = v / 1000; }, (v) => String(Math.round(v)));
-  bindSlider("bassLen", "bassLenVal", (el) => Number(el.value), (v) => { state.len.bass = v / 1000; }, (v) => String(Math.round(v)));
-  bindSlider("order", "orderVal", (el) => Number(el.value), (v) => { state.plate.order = v; }, (v) => String(v));
+  [["muteKick", "kick"], ["muteHat", "hat"], ["muteOpen", "open"], ["muteSnare", "snare"], ["muteRim", "rim"], ["muteBass", "bass"], ["muteStab", "stab"], ["mutePlate", "plate"]].forEach(([id, key]) => {
+    $(id).addEventListener("change", () => {
+      state.mute[key] = $(id).checked;
+      $(id).closest(".pair").classList.toggle("muted", $(id).checked);
+    });
+  });
+  bindSlider("tension", "tensionVal", pct("tension"), (v) => { state.plate.tension = v; }, asPct("tension"));
+  bindSlider("ring", "ringVal", ms, (v) => { state.plate.ring = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("kickLen", "kickLenVal", ms, (v) => { state.len.kick = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("hatLen", "hatLenVal", ms, (v) => { state.len.hat = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("openLen", "openLenVal", ms, (v) => { state.len.open = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("snareLen", "snareLenVal", ms, (v) => { state.len.snare = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("rimLen", "rimLenVal", ms, (v) => { state.len.rim = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("bassLen", "bassLenVal", ms, (v) => { state.len.bass = v / 1000; }, (v) => String(Math.round(v)));
+  bindSlider("order", "orderVal", pct("order"), (v) => { state.plate.order = Math.round(v); }, asPct("order"));
 
   const driftMap = {
     driftCutoff: "cutoff",
@@ -1279,7 +1399,7 @@ function wire() {
   };
   Object.entries(weightMap).forEach(([id, key]) => {
     $(id).addEventListener("input", () => {
-      state.weight[key] = Number($(id).value) / 100;
+      state.weight[key] = Number($(id).value);
       $(id + "Val").textContent = $(id).value;
     });
   });
@@ -1294,8 +1414,49 @@ function wire() {
     if (recording) stopRecording();
     else startRecording();
   });
-  $("hideUi").addEventListener("click", () => document.body.classList.add("plate-only"));
-  $("showUi").addEventListener("click", () => document.body.classList.remove("plate-only"));
+  $("helpOpen").addEventListener("click", () => $("help").showModal());
+  $("helpClose").addEventListener("click", () => $("help").close());
+  let topPinned = false;
+  let unpinTop;
+  let lastPointer = { clientX: 0, clientY: 999 };
+  const topOpen = () => document.body.classList.contains("plate-only") && document.body.classList.contains("reveal");
+  const pointerInTop = (e) => {
+    if (e.clientY <= 18) return true;
+    if (!topOpen()) return false;
+    const bar = $("account").getBoundingClientRect();
+    const help = document.querySelector(".top-menu").getBoundingClientRect();
+    return e.clientY <= bar.bottom + 8 || (e.clientX >= help.left - 8 && e.clientY <= help.bottom + 8);
+  };
+  const syncTop = (e) => {
+    if (!document.body.classList.contains("plate-only")) return;
+    if (pointerInTop(e) || topPinned) document.body.classList.add("reveal");
+    else document.body.classList.remove("reveal");
+  };
+  document.addEventListener("pointermove", (e) => {
+    lastPointer = e;
+    syncTop(e);
+  });
+  document.addEventListener("pointerdown", (e) => {
+    lastPointer = e;
+    if (!document.body.classList.contains("plate-only") || e.clientY > 48) return;
+    topPinned = true;
+    document.body.classList.add("reveal");
+    clearTimeout(unpinTop);
+    unpinTop = setTimeout(() => {
+      topPinned = false;
+      syncTop(lastPointer);
+    }, 4000);
+  });
+  $("hideUi").addEventListener("click", () => {
+    document.body.classList.add("plate-only");
+    document.body.classList.remove("reveal");
+    topPinned = false;
+  });
+  $("showUi").addEventListener("click", () => {
+    document.body.classList.remove("plate-only", "reveal");
+    topPinned = false;
+    clearTimeout(unpinTop);
+  });
 
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && e.target === document.body) {
@@ -1357,10 +1518,13 @@ function bits16(row) {
   return out;
 }
 
-function weights16(row) {
+function weights16(row, asPercent) {
   const out = STEP_CURVE.slice();
   if (!Array.isArray(row)) return out;
-  for (let i = 0; i < 16; i++) out[i] = clampNum(row[i], 0, 1, out[i]);
+  for (let i = 0; i < 16; i++) {
+    const n = clampNum(row[i], 0, asPercent ? 100 : 1, asPercent ? out[i] : out[i] / 100);
+    out[i] = asPercent ? n : n * 100;
+  }
   return out;
 }
 
@@ -1370,19 +1534,35 @@ function cleanSnapshot(data) {
   const stepWeight = {};
   ROWS.forEach((row) => {
     patterns[row.id] = bits16(src.patterns && src.patterns[row.id]);
-    stepWeight[row.id] = weights16(src.stepWeight && src.stepWeight[row.id]);
+    stepWeight[row.id] = weights16(src.stepWeight && src.stepWeight[row.id], !!src.stepWeightPercent);
   });
   const delays = [0.375, 0.5, 0.75, 1, 1.5];
   const delayBeats = delays.includes(Number(src.delayBeats)) ? Number(src.delayBeats) : 0.75;
   const color = /^#[0-9a-fA-F]{6}$/.test(src.color) ? src.color : "#3ec2ff";
   const drift = {};
   const weight = {};
-  ["cutoff", "feedback", "damp", "reverb", "decay", "pattern", "chord", "breakdown", "send", "width", "reso", "swing"].forEach((key) => {
+  const weightIds = ["cutoff", "feedback", "damp", "reverb", "decay", "pattern", "chord", "breakdown", "send", "width", "reso", "swing"];
+  weightIds.forEach((key) => {
     drift[key] = !!(src.drift && src.drift[key]);
-    weight[key] = clampNum(src.weight && src.weight[key], 0, 1, 1);
+    const fallback = key === "feedback" ? 25 : 100;
+    const raw = src.weight && src.weight[key];
+    weight[key] = src.weightPercent
+      ? clampNum(raw, 0, 100, fallback)
+      : clampNum(raw, 0, 1, fallback / 100) * 100;
   });
+  const chordIds = HARMONY.map((c) => c.id).concat("free");
+  let chord = chordIds.includes(src.chord) ? src.chord : "";
+  if (!chord) {
+    const degree = ((Number(src.degree) % 12) + 12) % 12;
+    const legacy = { 0: "i", 3: "III", 5: "iv", 7: "v", 8: "VI", 10: "VII" };
+    chord = legacy[degree] || "i";
+  }
   const lvl = {};
   const len = {};
+  const mute = {};
+  ["kick", "hat", "open", "snare", "rim", "bass", "stab", "plate"].forEach((id) => {
+    mute[id] = !!(src.mute && src.mute[id]);
+  });
   ["kick", "hat", "open", "snare", "rim", "stab", "plate"].forEach((id) => {
     lvl[id] = clampNum(src.lvl && src.lvl[id], 0, 1, id === "plate" ? 0 : 1);
   });
@@ -1395,7 +1575,10 @@ function cleanSnapshot(data) {
     bpm: clampNum(src.bpm, 112, 132, 122),
     swing: clampNum(src.swing, 0, 0.4, 0.14),
     root: 48 + clampNum(((Number(src.root) % 12) + 12) % 12, 0, 11, 2),
-    degree: clampNum(src.degree, -12, 24, 0),
+    chord,
+    freeSemi: clampNum(src.freeSemi, 0, 11, 0),
+    freeQuality: ["min", "maj", "sus", "min9"].includes(src.freeQuality) ? src.freeQuality : "min",
+    harmonise: src.harmonise !== false,
     delayBeats,
     feedback: clampNum(src.feedback, 0.2, 0.88, 0.7),
     damp: clampNum(src.damp, 400, 5000, 1400),
@@ -1410,6 +1593,7 @@ function cleanSnapshot(data) {
     color,
     lvl,
     len,
+    mute,
     plate: {
       tension: clampNum(src.plate && src.plate.tension, 0.4, 2.2, 1),
       ring: clampNum(src.plate && src.plate.ring, 0.2, 4.2, 1.8),
@@ -1433,7 +1617,12 @@ function songSnapshot() {
     bpm: state.bpm,
     swing: state.swing,
     root: state.root,
-    degree: state.degree,
+    chord: state.chord,
+    freeSemi: state.freeSemi,
+    freeQuality: state.freeQuality,
+    harmonise: $("harmonise").checked,
+    stepWeightPercent: true,
+    weightPercent: true,
     delayBeats: state.delayBeats,
     feedback: state.feedback,
     damp: state.damp,
@@ -1447,6 +1636,16 @@ function songSnapshot() {
     srs: state.srs,
     color: ($("baseColor") && $("baseColor").value) || state.color.hex,
     lvl: state.lvl,
+    mute: {
+      kick: $("muteKick").checked,
+      hat: $("muteHat").checked,
+      open: $("muteOpen").checked,
+      snare: $("muteSnare").checked,
+      rim: $("muteRim").checked,
+      bass: $("muteBass").checked,
+      stab: $("muteStab").checked,
+      plate: $("mutePlate").checked,
+    },
     len: state.len,
     plate: state.plate,
     drift: {
@@ -1483,7 +1682,10 @@ function applySnapshot(raw) {
     bpm: data.bpm,
     swing: data.swing,
     root: data.root,
-    degree: data.degree,
+    chord: data.chord,
+    freeSemi: data.freeSemi,
+    freeQuality: data.freeQuality,
+    harmonise: data.harmonise,
     delayBeats: data.delayBeats,
     feedback: data.feedback,
     damp: data.damp,
@@ -1498,6 +1700,7 @@ function applySnapshot(raw) {
     srs: data.srs,
     lvl: data.lvl,
     len: data.len,
+    mute: data.mute,
     plate: data.plate,
     drift: data.drift,
     weight: data.weight,
@@ -1505,31 +1708,35 @@ function applySnapshot(raw) {
     cutoffGlide: data.cutoffGlide,
   });
   set("bpm", state.bpm);
-  set("swing", Math.round(state.swing * 100));
+  set("swing", toPct("swing", state.swing));
   set("cutoff", Math.round(state.cutoff));
-  set("reso", state.reso);
+  set("reso", toPct("reso", state.reso));
   set("decay", Math.round(state.decay * 1000));
   set("send", Math.round(state.send * 100));
   set("feedback", Math.round(state.feedback * 100));
-  set("damp", Math.round(state.damp));
+  set("damp", toPct("damp", state.damp));
   set("reverb", Math.round(state.reverb * 100));
   set("bassLvl", Math.round(state.bassLvl * 100));
   set("drive", Math.round(state.drive * 100));
   set("srs", Math.round(state.srs * 100));
-  set("tension", Math.round(state.plate.tension * 100));
+  set("tension", toPct("tension", state.plate.tension));
   set("ring", Math.round(state.plate.ring * 1000));
-  set("order", state.plate.order);
+  set("order", toPct("order", state.plate.order));
   ["kick", "hat", "open", "snare", "rim", "stab", "plate"].forEach((id) => {
     const levelId = id === "stab" ? "stabLvl" : id === "rim" ? "rimLvl" : id === "plate" ? "plateLvl" : id + "Lvl";
-    const lenId = id === "stab" ? "decay" : id === "bass" ? "bassLen" : id === "plate" ? "ring" : id + "Len";
+    const lenId = id === "bass" ? "bassLen" : id + "Len";
     if (id !== "stab" && id !== "plate") set(levelId, Math.round(state.lvl[id] * 100));
     if (id === "stab") set("stabLvl", Math.round(state.lvl.stab * 100));
     if (id === "plate") set("plateLvl", Math.round(state.lvl.plate * 100));
-    if (lenId !== "decay" && lenId !== "ring" && state.len[id] != null) set(lenId, Math.round(state.len[id] * 1000));
+    if (id !== "stab" && id !== "plate" && state.len[id] != null) set(lenId, Math.round(state.len[id] * 1000));
   });
   $("root").value = String(((state.root % 12) + 12) % 12);
-  $("root").dispatchEvent(new Event("change", { bubbles: true }));
-  state.degree = data.degree;
+  $("harmonise").checked = !!state.harmonise;
+  [["muteKick", "kick"], ["muteHat", "hat"], ["muteOpen", "open"], ["muteSnare", "snare"], ["muteRim", "rim"], ["muteBass", "bass"], ["muteStab", "stab"], ["mutePlate", "plate"]].forEach(([id, key]) => {
+    $(id).checked = !!state.mute[key];
+    $(id).closest(".pair").classList.toggle("muted", $(id).checked);
+  });
+  fillChordSelect();
   $("div").value = String(state.delayBeats);
   $("div").dispatchEvent(new Event("change", { bubbles: true }));
   $("autopilot").checked = !!state.autopilot;
@@ -1553,7 +1760,7 @@ function applySnapshot(raw) {
     send: "wSend", width: "wWidth", reso: "wReso", swing: "wSwing",
   };
   Object.entries(weightIds).forEach(([key, id]) => {
-    $(id).value = Math.round(state.weight[key] * 100);
+    $(id).value = Math.round(state.weight[key]);
     $(id + "Val").textContent = $(id).value;
   });
   paintGrids();
