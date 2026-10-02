@@ -12,6 +12,8 @@ The lean-back session — step grids, autopilot, one-button regenerate — follo
 
 Live: https://xyzzyapps.github.io/endless_dub/
 
+A phone plays through the Csound engine. A computer keeps the original Web Audio graph.
+
 Support on https://xyzzy.gumroad.com/
 
 ## Assumptions

@@ -782,8 +782,13 @@ function buildSrs(input, output) {
   return side;
 }
 
+function isMobile() {
+  const touch = navigator.maxTouchPoints > 0 || window.matchMedia("(pointer: coarse)").matches;
+  return touch && window.innerWidth < 1100;
+}
+
 function applyParams() {
-  if (!ctx) return;
+  if (!ctx || (window.CsoundDub && CsoundDub.on)) return;
   const beat = 60 / state.bpm;
   delayL.delayTime.setTargetAtTime(beat * state.delayBeats, ctx.currentTime, 0.05);
   delayR.delayTime.setTargetAtTime(beat * state.delayBeats, ctx.currentTime, 0.05);
@@ -1412,7 +1417,9 @@ let shownCol = -1;
 
 function paintPlayhead() {
   let col = -1;
-  if (state.playing && ctx && state.nextTime) {
+  if (window.CsoundDub && CsoundDub.on) {
+    col = state.playing ? CsoundDub.step : -1;
+  } else if (state.playing && ctx && state.nextTime) {
     const sixteenth = (60 / state.bpm) / 4;
     const ahead = (state.nextTime - ctx.currentTime) / sixteenth;
     col = (state.step - Math.ceil(ahead) + 160) % 16;
@@ -1426,6 +1433,10 @@ function paintPlayhead() {
 
 function draw(now) {
   requestAnimationFrame(draw);
+  if (window.CsoundDub && CsoundDub.on && state.playing) {
+    glideCutoff();
+    glideDrift();
+  }
   paintPlayhead();
   plateFrame += 1;
   const phone = window.innerWidth < 800;
@@ -1534,6 +1545,23 @@ function wire() {
   });
 
   $("play").addEventListener("click", async () => {
+    if (isMobile()) {
+      try {
+        if (!window.CsoundDub) {
+          const build = (document.querySelector('meta[name="build"]') || {}).content || "";
+          const q = build && build !== "dev" ? "?v=" + build : "";
+          await import("./csound/csound-host.js" + q);
+        }
+        await CsoundDub.toggle(state);
+        ctx = CsoundDub.context;
+        master = CsoundDub.master;
+        analyser = CsoundDub.analyser;
+        $("play").textContent = state.playing ? "Stop" : "Play";
+        return;
+      } catch (err) {
+        console.error(err);
+      }
+    }
     if (!ctx) buildGraph();
     if (ctx.state === "suspended") await ctx.resume();
     state.playing = !state.playing;

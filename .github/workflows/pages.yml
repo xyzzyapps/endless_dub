@@ -31,6 +31,8 @@ jobs:
               -e "s/src=\"app.js\"/src=\"app.js?v=$sha\"/" \
               index.html > public/index.html
           cp app.js style.css preview.png favicon.svg public/
+          mkdir public/csound
+          cp csound/csound-host.js csound/csound.js csound/graph.orc public/csound/
           printf '%s\n' "$sha" > public/version.txt
       - uses: actions/upload-pages-artifact@v3
         with:
