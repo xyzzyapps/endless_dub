@@ -854,31 +854,24 @@ function onBar() {
   $("barCount").textContent = "bar " + state.bar;
   if (!state.autopilot) return;
 
-  if (state.bar % 8 === 0) {
-    const d = state.drift;
-    const w = state.weight;
-    const sway = (span) => (Math.random() * 2 - 1) * span;
-    if (d.feedback) state.feedback = clamp(state.feedback + sway(0.02 * w.feedback / 100), 0.45, 0.75);
-    if (d.damp) state.damp = clamp(state.damp + sway(350 * w.damp / 100), 500, 4200);
-    if (d.reverb) state.reverb = clamp(state.reverb + sway(0.08 * w.reverb / 100), 0.05, 0.8);
-    if (d.decay) state.decay = clamp(state.decay + sway(0.08 * w.decay / 100), 0.09, 0.8);
-    if (d.send) state.send = clamp(state.send + sway(0.06 * w.send / 100), 0.15, 0.9);
-    if (d.width) state.srs = clamp(state.srs + sway(0.08 * w.width / 100), 0.15, 0.9);
-    if (d.reso) state.reso = clamp(state.reso + sway(2.5 * w.reso / 100), 0, 14);
-    if (d.swing) state.swing = clamp(state.swing + sway(0.04 * w.swing / 100), 0, 0.4);
-    syncControls();
-    applyParams();
-  }
-  if (state.bar % 16 === 0 && state.drift.pattern && state.weight.pattern > 0) {
+  const patternEvery = driftEvery(16, state.weight.pattern);
+  if (state.bar % patternEvery === 0 && state.drift.pattern && state.weight.pattern > 0) {
     mutatePattern();
     paintGrids();
   }
-  if (state.drift.chord && state.weight.chord > 0 && state.holdBars >= state.minHold && state.bar % 16 === 0 && Math.random() < 0.65 * state.weight.chord / 100) {
+  const chordEvery = driftEvery(16, state.weight.chord);
+  if (state.drift.chord && state.weight.chord > 0 && state.holdBars >= state.minHold && state.bar % chordEvery === 0 && Math.random() < 0.65 * state.weight.chord / 100) {
     shiftChord();
   }
-  if (state.drift.breakdown && state.weight.breakdown > 0 && state.bar % 32 === 0 && Math.random() < 0.7 * state.weight.breakdown / 100) {
+  const breakEvery = driftEvery(32, state.weight.breakdown);
+  if (state.drift.breakdown && state.weight.breakdown > 0 && state.bar % breakEvery === 0 && Math.random() < 0.7 * state.weight.breakdown / 100) {
     state.breakdown = 4;
   }
+}
+
+function driftEvery(base, weight) {
+  const n = clamp(weight, 0, 100) / 100;
+  return Math.max(2, Math.round(base * (1 - 0.75 * n)));
 }
 
 function mutatePattern() {
@@ -1230,8 +1223,87 @@ function glideCutoff() {
   }
 }
 
+const DRIFT_KNOB = {
+  feedback: { get: () => state.feedback, set: (v) => { state.feedback = v; }, min: 0.45, max: 0.75, span: 0.14 },
+  damp: { get: () => state.damp, set: (v) => { state.damp = v; }, min: 400, max: 5000, span: 1400 },
+  reverb: { get: () => state.reverb, set: (v) => { state.reverb = v; }, min: 0.05, max: 0.8, span: 0.28 },
+  decay: { get: () => state.decay, set: (v) => { state.decay = v; }, min: 0.09, max: 0.8, span: 0.22 },
+  send: { get: () => state.send, set: (v) => { state.send = v; }, min: 0.15, max: 0.9, span: 0.28 },
+  width: { get: () => state.srs, set: (v) => { state.srs = v; }, min: 0, max: 1, span: 0.28 },
+  reso: { get: () => state.reso, set: (v) => { state.reso = v; }, min: 0, max: 18, span: 7 },
+  swing: { get: () => state.swing, set: (v) => { state.swing = v; }, min: 0, max: 0.4, span: 0.16 },
+};
+
+function holdDrift(key) {
+  if (!state.driftHold) state.driftHold = {};
+  if (!state.driftTarget) state.driftTarget = {};
+  state.driftHold[key] = (ctx ? ctx.currentTime : 0) + 2;
+  const spec = DRIFT_KNOB[key];
+  if (spec) state.driftTarget[key] = spec.get();
+}
+
+function paintDrift() {
+  const show = (id, key, value) => {
+    const pct = toPct(key, value);
+    $(id).value = pct;
+    $(id + "Val").textContent = String(pct);
+  };
+  show("damp", "damp", state.damp);
+  show("reso", "reso", state.reso);
+  show("swing", "swing", state.swing);
+  $("feedback").value = Math.round(state.feedback * 100);
+  $("feedbackVal").textContent = String(Math.round(state.feedback * 100));
+  $("decay").value = Math.round(state.decay * 1000);
+  $("decayVal").textContent = String(Math.round(state.decay * 1000));
+  $("reverb").value = Math.round(state.reverb * 100);
+  $("reverbVal").textContent = String(Math.round(state.reverb * 100));
+  $("send").value = Math.round(state.send * 100);
+  $("sendVal").textContent = String(Math.round(state.send * 100));
+  $("srs").value = Math.round(state.srs * 100);
+  $("srsVal").textContent = String(Math.round(state.srs * 100));
+}
+
+function glideDrift() {
+  if (!ctx || !state.playing || !state.autopilot) return;
+  const now = ctx.currentTime;
+  const dt = Math.min(0.1, Math.max(0.001, now - (state.driftStamp || now)));
+  state.driftStamp = now;
+  if (!state.driftAt) state.driftAt = {};
+  if (!state.driftTarget) state.driftTarget = {};
+  if (!state.driftHold) state.driftHold = {};
+  let moved = false;
+  Object.entries(DRIFT_KNOB).forEach(([key, spec]) => {
+    const weight = state.weight[key] || 0;
+    if (!state.drift[key] || weight <= 0) return;
+    if ((state.driftHold[key] || 0) > now) return;
+    const n = clamp(weight, 0, 100) / 100;
+    const span = spec.span * n;
+    if (now >= (state.driftAt[key] || 0)) {
+      const cur = spec.get();
+      const lo = clamp(cur - span, spec.min, spec.max);
+      const hi = clamp(cur + span, spec.min, spec.max);
+      const room = Math.max(0, hi - lo);
+      state.driftTarget[key] = room === 0 ? cur : clamp(lo + Math.random() * room, spec.min, spec.max);
+      state.driftAt[key] = now + 0.35 + (1 - n) * (1.2 + Math.random() * 5);
+    }
+    const cur = spec.get();
+    const target = state.driftTarget[key] == null ? cur : state.driftTarget[key];
+    const next = cur + (target - cur) * (1 - Math.exp(-dt * (0.45 + Math.pow(n, 1.4) * 8)));
+    if (Math.abs(next - cur) > 1e-5) {
+      spec.set(next);
+      moved = true;
+    }
+  });
+  if (moved && now - (state.driftUi || 0) > 0.08) {
+    state.driftUi = now;
+    paintDrift();
+    applyParams();
+  }
+}
+
 function scheduler() {
   glideCutoff();
+  glideDrift();
   if (!state.playing) return;
   const horizon = ctx.currentTime + 0.12;
   const sixteenth = (60 / state.bpm) / 4;
@@ -1481,6 +1553,7 @@ function wire() {
   $("swing").addEventListener("input", () => {
     state.swing = fromPct("swing", $("swing").value);
     $("swingVal").textContent = $("swing").value;
+    holdDrift("swing");
   });
   $("autopilot").addEventListener("change", () => {
     state.autopilot = $("autopilot").checked;
@@ -1520,12 +1593,12 @@ function wire() {
     state.cutoffTarget = v;
     if (ctx) state.cutoffRetarget = ctx.currentTime + 2;
   }, (v) => String(Math.round(v)));
-  bindSlider("reso", "resoVal", pct("reso"), (v) => { state.reso = v; }, asPct("reso"));
-  bindSlider("decay", "decayVal", ms, (v) => { state.decay = v / 1000; }, (v) => String(Math.round(v)));
-  bindSlider("send", "sendVal", (el) => Number(el.value), (v) => { state.send = v / 100; }, (v) => String(Math.round(v)));
-  bindSlider("feedback", "feedbackVal", ms, (v) => { state.feedback = v / 100; }, (v) => String(Math.round(v)));
-  bindSlider("damp", "dampVal", pct("damp"), (v) => { state.damp = v; }, asPct("damp"));
-  bindSlider("reverb", "reverbVal", (el) => Number(el.value), (v) => { state.reverb = v / 100; }, (v) => String(Math.round(v)));
+  bindSlider("reso", "resoVal", pct("reso"), (v) => { state.reso = v; holdDrift("reso"); }, asPct("reso"));
+  bindSlider("decay", "decayVal", ms, (v) => { state.decay = v / 1000; holdDrift("decay"); }, (v) => String(Math.round(v)));
+  bindSlider("send", "sendVal", (el) => Number(el.value), (v) => { state.send = v / 100; holdDrift("send"); }, (v) => String(Math.round(v)));
+  bindSlider("feedback", "feedbackVal", ms, (v) => { state.feedback = v / 100; holdDrift("feedback"); }, (v) => String(Math.round(v)));
+  bindSlider("damp", "dampVal", pct("damp"), (v) => { state.damp = v; holdDrift("damp"); }, asPct("damp"));
+  bindSlider("reverb", "reverbVal", (el) => Number(el.value), (v) => { state.reverb = v / 100; holdDrift("reverb"); }, (v) => String(Math.round(v)));
   bindSlider("bassLvl", "bassVal", (el) => Number(el.value), (v) => { state.bassLvl = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("kickLvl", "kickVal", (el) => Number(el.value), (v) => { state.lvl.kick = v / 100; }, (v) => String(Math.round(v)));
   bindSlider("hatLvl", "hatVal", (el) => Number(el.value), (v) => { state.lvl.hat = v / 100; }, (v) => String(Math.round(v)));
@@ -1588,7 +1661,7 @@ function wire() {
     });
   });
   bindSlider("drive", "driveVal", (el) => Number(el.value), (v) => { state.drive = v / 100; }, (v) => String(Math.round(v)));
-  bindSlider("srs", "srsVal", (el) => Number(el.value), (v) => { state.srs = v / 100; }, (v) => String(Math.round(v)));
+  bindSlider("srs", "srsVal", (el) => Number(el.value), (v) => { state.srs = v / 100; holdDrift("width"); }, (v) => String(Math.round(v)));
   $("div").addEventListener("change", () => {
     state.delayBeats = Number($("div").value);
     applyParams();

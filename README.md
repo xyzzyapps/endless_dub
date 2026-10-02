@@ -25,20 +25,20 @@ The starting pattern, the step weights, and the knob positions are the visible a
 
 Cutoff glides continuously. Weight 20 keeps it near ±20 Hz. Weight 100 can move about ±800 Hz and picks a new spot about every third of a second.
 
-The other autopilot weights take one step every eight bars. At 100, that step is:
+The other autopilot knobs glide the same way. The weight is how far they may wander and how soon they pick a new spot. At 100 the reach is:
 
-| Weight | Step |
+| Weight | Reach |
 |---|---|
-| Feedback | ±2%, and it will not go above 75% |
-| Damp | ±350 Hz |
-| Reverb | ±8% |
-| Decay | ±80 ms |
-| Delay send | ±6% |
-| Width | ±8% |
-| Resonance | ±2.5 |
-| Swing | ±0.04 |
+| Feedback | ±14%, and it will not go above 75% |
+| Damp | ±1400 Hz |
+| Reverb | ±28% |
+| Decay | ±220 ms |
+| Delay send | ±28% |
+| Width | ±28% |
+| Resonance | ±7 |
+| Swing | ±0.16 |
 
-Pattern and chord are checked every 16 bars, and a breakdown every 32. A higher weight makes that check more likely. It does not make it happen sooner.
+At 100, pattern and chord are checked about every 4 bars, and a breakdown about every 8. A chord change still waits out the 16-bar hold. A lower weight waits longer and moves less.
 
 A saved song would store the pattern, every step weight, and the knob values. **New pattern** would still follow the rules above.
 

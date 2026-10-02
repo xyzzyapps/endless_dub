@@ -75,10 +75,10 @@
   <p>Under Chord shapes every chord type has a row: Open 5, Minor 7, High 5, Minor, Sus, Minor 9, and Major. The outlined row is the one playing now. Click a square to choose the next chord. Click it again to clear that row. Drag a square to share the 100 with the square beside it. It starts as Open 5, then Minor 7, then High 5, then back. The other rows start empty, so they stay out of the loop until you click one. An empty row is skipped.</p>
   <h3>Echo, filter, and space</h3>
   <p>Delay time picks how long the echo waits, in musical lengths such as a dotted eighth. Feedback is how much of the echo is sent back in, from 20 to 88. Higher is wetter. It will not be pushed past 75 by Autopilot, so it does not turn into noise.</p>
-  <p>Cutoff is the filter, in hertz. Lower sounds darker, higher sounds brighter. It starts at 680. Autopilot nudges it by about 20 hertz. Interpolate makes the filter glide. Turn it off and the filter jumps.</p>
+  <p>Cutoff is the filter, in hertz. Lower sounds darker, higher sounds brighter. It starts at 680. Its weight starts at 20, about 20 hertz of drift. Turn that weight up and the filter moves farther and faster. Interpolate makes the filter glide. Turn it off and the filter jumps.</p>
   <p>Most other sliders are simply 0 to 100: how much echo is sent, how much reverb, how much warmth, how wide the stereo image is. You can turn them until it sounds right. The number is a position on that slider, not a special unit.</p>
   <h3>Autopilot</h3>
-  <p>Leave this on if you want the page to keep the jam moving. A ticked box is allowed to wander. The small slider under it is how far it may wander, from 0 to 100.</p>
+  <p>Leave this on if you want the page to keep the jam moving. A ticked box is allowed to wander. The small slider under it is how far and how fast it may wander, from 0 to 100. 100 keeps picking a new spot. A low number barely leaves where it is.</p>
   <p>It does not touch your volumes, note lengths, home note, speed, delay time, or drive. Those stay where you put them.</p>
   <h3>Saving</h3>
   <p>Sign up with email and a password. After you are signed in, Save stores this loop, and Share copies a link you can send. Sign out is there too. The email boxes hide once you are in.</p>
@@ -264,7 +264,7 @@
       <label class="drift-item"><span><input id="driftReso" type="checkbox"> Resonance</span><input id="wReso" type="range" min="0" max="100" step="1" value="100"><b id="wResoVal">100</b></label>
       <label class="drift-item"><span><input id="driftSwing" type="checkbox" checked> Swing</span><input id="wSwing" type="range" min="0" max="100" step="1" value="100"><b id="wSwingVal">100</b></label>
     </div>
-    <p class="hint">The slider under each switch is how far autopilot may wander. Feedback stays a small nudge and will not climb into the noisy range. Levels, note length, root key, tempo, delay time, drive, and plate tension stay fixed.</p>
+    <p class="hint">The slider under each switch is how far and how fast autopilot may wander. 100 keeps moving. A low number stays close. Feedback will not climb above 75. Levels, note length, root key, tempo, delay time, drive, and plate tension stay fixed.</p>
   </section>
 
   <footer>
