@@ -23,6 +23,23 @@ The starting pattern, the step weights, and the knob positions are the visible a
 * Tempo stays in beats per minute and starts at 122. Cutoff is in hertz and starts at 680. Feedback is the percent sent back around the delay, from 20 to 88, and starts at 70. Note lengths are in milliseconds. The other sliders are 0 to 100 across their own range. The delay starts as a dotted eighth. The plate starts silent. Cutoff glide, Muteouts, and Swing start on. Delay send, Width, and Resonance start off. Feedback cannot drift above 0.75.
 * Waveforms, plate mode ratios, kick ducking, and the stereo width circuit are fixed. No control rewrites them.
 
+Cutoff glides continuously. Weight 20 keeps it near ±20 Hz. Weight 100 can move about ±800 Hz and picks a new spot about every third of a second.
+
+The other autopilot weights take one step every eight bars. At 100, that step is:
+
+| Weight | Step |
+|---|---|
+| Feedback | ±2%, and it will not go above 75% |
+| Damp | ±350 Hz |
+| Reverb | ±8% |
+| Decay | ±80 ms |
+| Delay send | ±6% |
+| Width | ±8% |
+| Resonance | ±2.5 |
+| Swing | ±0.04 |
+
+Pattern and chord are checked every 16 bars, and a breakdown every 32. A higher weight makes that check more likely. It does not make it happen sooner.
+
 A saved song would store the pattern, every step weight, and the knob values. **New pattern** would still follow the rules above.
 
 ## License

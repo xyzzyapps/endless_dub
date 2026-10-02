@@ -1210,15 +1210,17 @@ function glideCutoff() {
   const now = ctx.currentTime;
   const dt = Math.min(0.1, Math.max(0.001, now - (state.cutoffStamp || now)));
   state.cutoffStamp = now;
+  const w = clamp(state.weight.cutoff, 0, 100);
+  const n = w / 100;
+  const span = w <= 20 ? w : 20 + ((w - 20) / 80) * 780;
   if (now >= state.cutoffRetarget) {
-    const span = state.weight.cutoff;
-    const lo = clamp(state.cutoff - span, 160, 2400);
-    const hi = clamp(state.cutoff + span, 160, 2400);
+    const lo = clamp(state.cutoff - span, 180, 2400);
+    const hi = clamp(state.cutoff + span, 180, 2400);
     const room = Math.max(0, hi - lo);
-    state.cutoffTarget = room === 0 ? state.cutoff : clamp(lo + Math.random() * room, 160, 2400);
-    state.cutoffRetarget = now + 1.2 + Math.random() * (4.5 - state.weight.cutoff / 100 * 2);
+    state.cutoffTarget = room === 0 ? state.cutoff : clamp(lo + Math.random() * room, 180, 2400);
+    state.cutoffRetarget = now + 0.28 + (1 - n) * (1.1 + Math.random() * 4.2);
   }
-  const rate = 0.45 + state.weight.cutoff / 100 * 1.6;
+  const rate = 0.4 + Math.pow(n, 1.5) * 14;
   if (state.cutoffGlide) state.cutoff += (state.cutoffTarget - state.cutoff) * (1 - Math.exp(-dt * rate));
   else state.cutoff = state.cutoffTarget;
   if (now - state.cutoffUi > 0.08) {
