@@ -198,76 +198,16 @@ function stepPct(voice, step) {
   return state.stepWeight[voice][step] / 100;
 }
 
-function hit(voice, step, base) {
-  return Math.random() < base * stepPct(voice, step);
-}
-
-function pickWeighted(voice, pool) {
-  let total = 0;
-  for (let i = 0; i < pool.length; i++) total += state.stepWeight[voice][pool[i]];
-  if (total <= 0) return -1;
-  let r = Math.random() * total;
-  for (let i = 0; i < pool.length; i++) {
-    r -= state.stepWeight[voice][pool[i]];
-    if (r <= 0) return pool[i];
-  }
-  return pool[pool.length - 1];
-}
-
-function place(pattern, voice, pool) {
-  const i = pickWeighted(voice, pool);
-  if (i >= 0) pattern[i] = 1;
+function patternFromWeights() {
+  const next = {};
+  ROWS.forEach((row) => {
+    next[row.id] = Array.from({ length: 16 }, (_, i) => (Math.random() < stepPct(row.id, i) ? 1 : 0));
+  });
+  return next;
 }
 
 function makePattern() {
-  const kick = Array.from({ length: 16 }, (_, i) => (i % 4 === 0 && hit("kick", i, 0.95) ? 1 : 0));
-  if (!kick.some((v) => v)) place(kick, "kick", [0, 4, 8, 12]);
-
-  const hat = Array.from({ length: 16 }, (_, i) => (hit("hat", i, i % 2 === 0 ? 0.35 : 0.72) ? 1 : 0));
-  hat[0] = 0;
-
-  const open = Array(16).fill(0);
-  place(open, "open", [6, 10, 14]);
-  if (Math.random() < 0.35) {
-    const extra = pickWeighted("open", [6, 10, 14]);
-    if (extra >= 0 && hit("open", extra, 1)) open[extra] = 1;
-  }
-
-  const snare = Array(16).fill(0);
-  if (hit("snare", 4, 0.95)) snare[4] = 1;
-  if (hit("snare", 12, 0.95)) snare[12] = 1;
-  if (!snare[4] && !snare[12]) place(snare, "snare", [4, 12]);
-  if (hit("snare", 13, 0.3)) snare[13] = 1;
-
-  const perc = Array(16).fill(0);
-  if (hit("perc", 6, 0.9)) perc[6] = 1;
-  if (hit("perc", 14, 0.7)) perc[14] = 1;
-  if (hit("perc", 10, 0.25)) perc[10] = 1;
-
-  const bass = Array(16).fill(0);
-  if (hit("bass", 0, 1)) bass[0] = 1;
-  const off = pickWeighted("bass", [6, 7, 10, 14]);
-  if (off >= 0 && hit("bass", off, 0.85)) bass[off] = 1;
-  if (hit("bass", 8, 0.4)) bass[8] = 1;
-  if (!bass.some((v) => v)) place(bass, "bass", [0]);
-
-  const stab = Array(16).fill(0);
-  const candidates = [3, 6, 7, 10, 11, 14];
-  const hits = 2 + Math.floor(Math.random() * 2);
-  for (let n = 0; n < hits; n++) {
-    const i = pickWeighted("stab", candidates);
-    if (i >= 0 && hit("stab", i, 0.9)) stab[i] = 1;
-  }
-  if (!stab.some((v) => v)) place(stab, "stab", candidates);
-
-  const plate = Array(16).fill(0);
-  place(plate, "plate", [2, 7, 10, 11, 15]);
-  if (Math.random() < 0.4) {
-    const extra = pickWeighted("plate", [2, 7, 10, 11, 15]);
-    if (extra >= 0 && hit("plate", extra, 0.8)) plate[extra] = 1;
-  }
-
-  state.patterns = { kick, hat, open, snare, perc, bass, stab, plate };
+  state.patterns = patternFromWeights();
 }
 
 function seedPattern() {
@@ -860,8 +800,8 @@ function onBar() {
   if (!state.autopilot) return;
 
   if (state.bar % 16 !== 0) return;
-  if (state.drift.pattern && state.weight.pattern > 0) {
-    mutatePattern();
+  if (state.drift.pattern && Math.random() < state.weight.pattern / 100) {
+    makePattern();
     paintGrids();
   }
   if (state.drift.chord && state.weight.chord > 0 && state.holdBars >= state.minHold && Math.random() < 0.65 * state.weight.chord / 100) {
@@ -870,41 +810,6 @@ function onBar() {
   if (state.drift.breakdown && state.weight.breakdown > 0 && Math.random() < 0.7 * state.weight.breakdown / 100) {
     state.breakdown = 4;
   }
-}
-
-function rollSteps(pattern, voice, steps) {
-  const w = state.weight.pattern / 100;
-  steps.forEach((i) => {
-    pattern[i] = Math.random() < w * stepPct(voice, i) ? 1 : 0;
-  });
-}
-
-function mutatePattern() {
-  const kick = state.patterns.kick;
-  rollSteps(kick, "kick", [0, 4, 8, 12]);
-  if (!kick[0] && !kick[4] && !kick[8] && !kick[12]) place(kick, "kick", [0, 4, 8, 12]);
-
-  const hat = state.patterns.hat;
-  rollSteps(hat, "hat", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
-  hat[0] = 0;
-
-  rollSteps(state.patterns.open, "open", [6, 10, 14]);
-
-  const snare = state.patterns.snare;
-  rollSteps(snare, "snare", [4, 12, 13]);
-  if (!snare[4] && !snare[12]) place(snare, "snare", [4, 12]);
-
-  rollSteps(state.patterns.perc, "perc", [6, 10, 14]);
-
-  const bass = state.patterns.bass;
-  rollSteps(bass, "bass", [0, 6, 7, 8, 10, 14]);
-  if (!bass.some((v) => v)) place(bass, "bass", [0]);
-
-  const stab = state.patterns.stab;
-  rollSteps(stab, "stab", [3, 6, 7, 10, 11, 14]);
-  if (stab.reduce((sum, v) => sum + v, 0) < 2) place(stab, "stab", [3, 6, 10, 14]);
-
-  rollSteps(state.patterns.plate, "plate", [2, 7, 10, 11, 15]);
 }
 
 function shiftChord() {
