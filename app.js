@@ -90,8 +90,8 @@ const state = {
     damp: 100,
     reverb: 100,
     decay: 100,
-    pattern: 100,
-    chord: 100,
+    pattern: 20,
+    chord: 20,
     breakdown: 100,
     send: 100,
     width: 100,
@@ -1825,7 +1825,7 @@ function cleanSnapshot(data) {
   const weightIds = ["cutoff", "feedback", "damp", "reverb", "decay", "pattern", "chord", "breakdown", "send", "width", "reso", "swing"];
   weightIds.forEach((key) => {
     drift[key] = !!(src.drift && src.drift[key]);
-    const fallback = key === "feedback" ? 25 : key === "cutoff" ? 20 : 100;
+    const fallback = key === "feedback" ? 25 : (key === "cutoff" || key === "pattern" || key === "chord") ? 20 : 100;
     const raw = src.weight && src.weight[key];
     weight[key] = src.weightPercent
       ? clampNum(raw, 0, 100, fallback)
