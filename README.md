@@ -12,7 +12,7 @@ The lean-back session — step grids, autopilot, one-button regenerate — follo
 
 Live: https://xyzzyapps.github.io/endless_dub/
 
-A phone plays through the Csound engine at the phone’s own sample rate, with a larger playback buffer and a 1.6 second reverb in wider partitions. A computer keeps the original Web Audio graph.
+A phone plays the same Web Audio graph as a computer. The phone asks for a larger playback buffer, reuses a small set of kick, hat, snare, bass, and chord voices, and draws the plate and waveform about four times a second while it is playing. A computer still builds a fresh voice on every hit. The Csound engine is not used.
 
 Support on https://xyzzy.gumroad.com/
 

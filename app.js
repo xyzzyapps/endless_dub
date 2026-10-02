@@ -112,6 +112,7 @@ let ctx, master, drumBus, musicBus, duck, delaySend, reverbSend;
 let delayL, delayR, fbL, fbR, dampL, dampR;
 let comp, shaper, analyser, srsSide;
 let noiseBuf;
+let mobileVoices = null;
 let timer;
 let recorder = null;
 let recordMute = null;
@@ -331,7 +332,287 @@ function noiseBurst(t, dur, filterType, freq, q, peak, dest) {
   src.stop(t + dur + 0.05);
 }
 
+function loopNoise() {
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuf;
+  src.loop = true;
+  src.start();
+  return src;
+}
+
+function silentGain() {
+  const g = ctx.createGain();
+  g.gain.value = 0.0001;
+  return g;
+}
+
+function takeVoice(pool) {
+  let best = pool[0];
+  for (let i = 1; i < pool.length; i++) {
+    if (pool[i].freeAt < best.freeAt) best = pool[i];
+  }
+  return best;
+}
+
+function whenDue(t) {
+  return Math.max(t, ctx.currentTime);
+}
+
+function retrigger(param, t, attack, hold, release, peak) {
+  const level = Math.max(0.0001, peak);
+  const a = Math.max(0.001, attack);
+  const rel = Math.max(0.001, release);
+  param.cancelScheduledValues(t);
+  param.setValueAtTime(0.0001, t);
+  param.exponentialRampToValueAtTime(level, t + a);
+  param.setValueAtTime(level, t + a + hold);
+  param.exponentialRampToValueAtTime(0.0001, t + a + hold + rel);
+}
+
+function makeKickVoice() {
+  const o = ctx.createOscillator();
+  o.type = "sine";
+  o.frequency.value = 46;
+  const g = silentGain();
+  o.connect(g);
+  g.connect(drumBus);
+  o.start();
+  const click = loopNoise();
+  const f = ctx.createBiquadFilter();
+  f.type = "highpass";
+  f.frequency.value = 1800;
+  f.Q.value = 0.7;
+  const cg = silentGain();
+  click.connect(f);
+  f.connect(cg);
+  cg.connect(drumBus);
+  return { o, g, cg, freeAt: 0 };
+}
+
+function makeHatVoice() {
+  const src = loopNoise();
+  const f = ctx.createBiquadFilter();
+  f.type = "highpass";
+  f.Q.value = 0.55;
+  const g = silentGain();
+  src.connect(f);
+  f.connect(g);
+  g.connect(drumBus);
+  const bright = loopNoise();
+  const bf = ctx.createBiquadFilter();
+  bf.type = "bandpass";
+  bf.frequency.value = 9000;
+  bf.Q.value = 0.7;
+  const bg = silentGain();
+  bright.connect(bf);
+  bf.connect(bg);
+  bg.connect(drumBus);
+  return { f, g, bg, freeAt: 0 };
+}
+
+function makeSnareVoice() {
+  const body = ctx.createOscillator();
+  body.type = "triangle";
+  body.frequency.value = 150;
+  const bodyGain = silentGain();
+  body.connect(bodyGain);
+  bodyGain.connect(drumBus);
+  body.start();
+  const bursts = [0, 1, 2].map(() => {
+    const src = loopNoise();
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.frequency.value = 1800;
+    f.Q.value = 0.8;
+    const g = silentGain();
+    src.connect(f);
+    f.connect(g);
+    g.connect(drumBus);
+    return g;
+  });
+  const src = loopNoise();
+  const f = ctx.createBiquadFilter();
+  f.type = "highpass";
+  f.frequency.value = 2500;
+  f.Q.value = 0.5;
+  const send = silentGain();
+  src.connect(f);
+  f.connect(send);
+  send.connect(delaySend);
+  return { body, bodyGain, bursts, send, freeAt: 0 };
+}
+
+function makeBassVoice() {
+  const o = ctx.createOscillator();
+  const sub = ctx.createOscillator();
+  o.type = "sine";
+  sub.type = "sine";
+  const f = ctx.createBiquadFilter();
+  f.type = "lowpass";
+  f.frequency.value = 220;
+  const g = silentGain();
+  const g2 = silentGain();
+  o.connect(f);
+  f.connect(g);
+  g.connect(musicBus);
+  sub.connect(g2);
+  g2.connect(musicBus);
+  o.start();
+  sub.start();
+  return { o, sub, g, g2, freeAt: 0 };
+}
+
+function makeStabVoice() {
+  const notes = [];
+  for (let idx = 0; idx < 4; idx++) {
+    notes.push([-7, 0, 6].map((cents) => {
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.detune.value = cents + (idx - 1) * 2;
+      const f1 = ctx.createBiquadFilter();
+      const f2 = ctx.createBiquadFilter();
+      f1.type = "lowpass";
+      f2.type = "lowpass";
+      f2.Q.value = 0.6;
+      const g = silentGain();
+      o.connect(f1);
+      f1.connect(f2);
+      f2.connect(g);
+      g.connect(musicBus);
+      g.connect(delaySend);
+      g.connect(reverbSend);
+      o.start();
+      return { o, f1, f2, g };
+    }));
+  }
+  const src = loopNoise();
+  const f = ctx.createBiquadFilter();
+  f.type = "bandpass";
+  f.frequency.value = 900;
+  f.Q.value = 0.8;
+  const ng = silentGain();
+  src.connect(f);
+  f.connect(ng);
+  ng.connect(delaySend);
+  return { notes, ng, freeAt: 0 };
+}
+
+function buildMobileVoices() {
+  mobileVoices = {
+    kick: [makeKickVoice(), makeKickVoice()],
+    hat: [makeHatVoice(), makeHatVoice(), makeHatVoice(), makeHatVoice()],
+    snare: [makeSnareVoice(), makeSnareVoice()],
+    bass: [makeBassVoice(), makeBassVoice(), makeBassVoice()],
+    stab: [makeStabVoice(), makeStabVoice()],
+  };
+}
+
+function fireKick(t) {
+  const when = whenDue(t);
+  const v = takeVoice(mobileVoices.kick);
+  const kickLen = state.len.kick;
+  v.freeAt = when + kickLen;
+  const freq = v.o.frequency;
+  freq.cancelScheduledValues(when);
+  freq.setValueAtTime(165, when);
+  freq.exponentialRampToValueAtTime(46, when + Math.min(0.07, kickLen * 0.4));
+  const body = Math.max(0.0001, 0.95 * state.lvl.kick);
+  const p = v.g.gain;
+  p.cancelScheduledValues(when);
+  p.setValueAtTime(0.0001, when);
+  p.exponentialRampToValueAtTime(body, when + 0.004);
+  p.exponentialRampToValueAtTime(0.0001, when + Math.max(0.005, kickLen));
+  retrigger(v.cg.gain, when, 0.002, 0, 0.018, 0.28 * state.lvl.kick);
+  const duckG = duck.gain;
+  duckG.cancelScheduledValues(when);
+  duckG.setValueAtTime(1, when);
+  duckG.linearRampToValueAtTime(0.62, when + 0.03);
+  duckG.linearRampToValueAtTime(1, when + 0.22);
+}
+
+function fireHat(t, open) {
+  const swingDelay = (state.step % 2 === 1) ? (60 / state.bpm) / 4 * state.swing : 0;
+  const when = whenDue(t + swingDelay);
+  const v = takeVoice(mobileVoices.hat);
+  const level = open ? state.lvl.open : state.lvl.hat;
+  const dur = open ? state.len.open : state.len.hat;
+  v.freeAt = when + dur;
+  v.f.frequency.setValueAtTime(open ? 5200 : 8000, when);
+  retrigger(v.g.gain, when, 0.002, 0, dur, (open ? 0.16 : 0.07) * level);
+  if (open) retrigger(v.bg.gain, when, 0.002, 0, dur * 0.7, 0.05 * level);
+  else {
+    v.bg.gain.cancelScheduledValues(when);
+    v.bg.gain.setValueAtTime(0.0001, when);
+  }
+}
+
+function fireSnare(t) {
+  const when = whenDue(t);
+  const v = takeVoice(mobileVoices.snare);
+  const sn = state.lvl.snare;
+  const snLen = state.len.snare;
+  v.freeAt = when + snLen;
+  const freq = v.body.frequency;
+  freq.cancelScheduledValues(when);
+  freq.setValueAtTime(196, when);
+  freq.exponentialRampToValueAtTime(150, when + Math.min(0.12, Math.max(0.001, snLen)));
+  retrigger(v.bodyGain.gain, when, 0.002, 0.01, snLen, 0.28 * sn);
+  [0, 0.012, 0.024].forEach((offset, i) => {
+    retrigger(v.bursts[i].gain, whenDue(when + offset), 0.002, 0, Math.max(0.02, snLen * (0.7 - i * 0.15)), (0.22 - i * 0.04) * sn);
+  });
+  retrigger(v.send.gain, when, 0.002, 0, Math.max(0.001, snLen * 0.8), 0.16 * sn);
+}
+
+function fireBass(t, step) {
+  const when = whenDue(t);
+  const v = takeVoice(mobileVoices.bass);
+  const root = state.root - 24;
+  let note = root;
+  if (step === 8 || step === 10) note = root + 7;
+  if (step % 7 === 6) note = root + (Math.random() < 0.5 ? 0 : 7);
+  v.freeAt = when + state.len.bass * 1.15;
+  const hz = midiToHz(note);
+  v.o.frequency.cancelScheduledValues(when);
+  v.o.frequency.setValueAtTime(hz, when);
+  v.sub.frequency.cancelScheduledValues(when);
+  v.sub.frequency.setValueAtTime(midiToHz(note - 12), when);
+  retrigger(v.g.gain, when, 0.012, 0.05, state.len.bass, 0.55 * state.bassLvl);
+  retrigger(v.g2.gain, when, 0.02, 0.08, state.len.bass * 1.15, 0.45 * state.bassLvl);
+}
+
+function fireStab(t) {
+  const when = whenDue(t);
+  const v = takeVoice(mobileVoices.stab);
+  const notes = stabNotes();
+  const peak = 0.11 * state.lvl.stab;
+  const start = Math.min(4200, state.cutoff * (2.4 + state.reso / 10));
+  const end1 = Math.max(80, state.cutoff * 0.55);
+  const end2 = Math.max(90, state.cutoff * 0.45);
+  const q = 0.4 + state.reso / 10;
+  const decay = Math.max(0.02, state.decay);
+  v.freeAt = when + decay + 0.08;
+  notes.forEach((n, idx) => {
+    const hz = midiToHz(n);
+    v.notes[idx].forEach((part) => {
+      part.o.frequency.cancelScheduledValues(when);
+      part.o.frequency.setValueAtTime(hz, when);
+      const f1 = part.f1.frequency;
+      f1.cancelScheduledValues(when);
+      f1.setValueAtTime(Math.max(80, start), when);
+      f1.exponentialRampToValueAtTime(end1, when + decay);
+      const f2 = part.f2.frequency;
+      f2.cancelScheduledValues(when);
+      f2.setValueAtTime(Math.max(90, start * 0.85), when);
+      f2.exponentialRampToValueAtTime(end2, when + decay);
+      part.f1.Q.setValueAtTime(q, when);
+      retrigger(part.g.gain, when, 0.008, 0.02, decay, peak);
+    });
+  });
+  retrigger(v.ng.gain, when, 0.002, 0, 0.06, 0.05);
+}
+
 function playKick(t) {
+  if (mobileVoices) return fireKick(t);
   const o = ctx.createOscillator();
   const g = ctx.createGain();
   o.type = "sine";
@@ -353,6 +634,7 @@ function playKick(t) {
 }
 
 function playHat(t, open) {
+  if (mobileVoices) return fireHat(t, open);
   const swingDelay = (state.step % 2 === 1) ? (60 / state.bpm) / 4 * state.swing : 0;
   const when = t + swingDelay;
   const level = open ? state.lvl.open : state.lvl.hat;
@@ -362,6 +644,7 @@ function playHat(t, open) {
 }
 
 function playSnare(t) {
+  if (mobileVoices) return fireSnare(t);
   const body = ctx.createOscillator();
   body.type = "triangle";
   body.frequency.setValueAtTime(196, t);
@@ -393,6 +676,7 @@ function playRim(t) {
 }
 
 function playBass(t, step) {
+  if (mobileVoices) return fireBass(t, step);
   const root = state.root - 24;
   let note = root;
   if (step === 8 || step === 10) note = root + 7;
@@ -564,6 +848,7 @@ function renderMarkov() {
 }
 
 function playStab(t) {
+  if (mobileVoices) return fireStab(t);
   const notes = stabNotes();
   const peak = 0.11 * state.lvl.stab;
   notes.forEach((n, idx) => {
@@ -596,7 +881,7 @@ function playStab(t) {
 }
 
 function buildGraph() {
-  ctx = new AudioContext();
+  ctx = isMobile() ? new AudioContext({ latencyHint: "playback" }) : new AudioContext();
   noiseBuf = noiseBuffer();
 
   drumBus = ctx.createGain();
@@ -663,6 +948,7 @@ function buildGraph() {
 
   buildReverb();
   applyParams();
+  if (isMobile()) buildMobileVoices();
 }
 
 function buildReverb() {
@@ -1318,6 +1604,7 @@ function drawPlate(now) {
 }
 
 let plateFrame = 0;
+let phoneDrawAt = 0;
 
 let shownCol = -1;
 
@@ -1349,8 +1636,12 @@ function draw(now) {
   }
   paintPlayhead();
   plateFrame += 1;
+  const stamp = now || performance.now();
+  const slowPhone = isMobile() && state.playing && !recording;
+  if (slowPhone && stamp - phoneDrawAt < 250) return;
+  if (slowPhone) phoneDrawAt = stamp;
   const phone = window.innerWidth < 800;
-  if (!phone || plateFrame % 2 === 0 || recording) drawPlate(now || performance.now());
+  if (!phone || plateFrame % 2 === 0 || recording) drawPlate(stamp);
   if (recording && recordCtx) {
     recordCtx.drawImage($("plate"), 0, 0, recordCanvas.width, recordCanvas.height);
   }
@@ -1455,23 +1746,6 @@ function wire() {
   });
 
   $("play").addEventListener("click", async () => {
-    if (isMobile()) {
-      try {
-        if (!window.CsoundDub) {
-          const build = (document.querySelector('meta[name="build"]') || {}).content || "";
-          const q = build && build !== "dev" ? "?v=" + build : "";
-          await import("./csound/csound-host.js" + q);
-        }
-        await CsoundDub.toggle(state);
-        ctx = CsoundDub.context;
-        master = CsoundDub.master;
-        analyser = CsoundDub.analyser;
-        $("play").textContent = state.playing ? "Stop" : "Play";
-        return;
-      } catch (err) {
-        console.error(err);
-      }
-    }
     if (!ctx) buildGraph();
     if (ctx.state === "suspended") await ctx.resume();
     state.playing = !state.playing;
