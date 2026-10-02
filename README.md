@@ -40,7 +40,7 @@ The other autopilot knobs glide the same way. The weight is how far they may wan
 | Resonance | ±7 |
 | Swing | ±0.16 |
 
-At 100, pattern and chord are checked about every 4 bars, and a breakdown about every 8. A chord change still waits out the 16-bar hold. A lower weight waits longer and moves less.
+Pattern, chord, and muteouts are checked at the end of every 16 bars. The pattern weight scales each step’s own weight. A higher chord or muteout weight makes that 16-bar change more likely. The effect knobs move on every step, the same way cutoff does.
 
 A saved song would store the pattern, every step weight, and the knob values. **New pattern** would still follow the rules above.
 

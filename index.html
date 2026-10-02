@@ -78,7 +78,7 @@
   <p>Cutoff is the filter, in hertz. Lower sounds darker, higher sounds brighter. It starts at 680. Its weight starts at 20, about 20 hertz of drift. Turn that weight up and the filter moves farther and faster. Interpolate makes the filter glide. Turn it off and the filter jumps.</p>
   <p>Most other sliders are simply 0 to 100: how much echo is sent, how much reverb, how much warmth, how wide the stereo image is. You can turn them until it sounds right. The number is a position on that slider, not a special unit.</p>
   <h3>Autopilot</h3>
-  <p>Leave this on if you want the page to keep the jam moving. A ticked box is allowed to wander. The small slider under it is how far and how fast it may wander, from 0 to 100. 100 keeps picking a new spot. A low number barely leaves where it is.</p>
+  <p>Leave this on if you want the page to keep the jam moving. A ticked box is allowed to wander. The small slider under it is how far it may wander, from 0 to 100. Pattern, chord, and muteouts wait until 16 bars have finished. The filter and the effect knobs move on every step.</p>
   <p>It does not touch your volumes, note lengths, home note, speed, delay time, or drive. Those stay where you put them.</p>
   <h3>Saving</h3>
   <p>Sign up with email and a password. After you are signed in, Save stores this loop, and Share copies a link you can send. Sign out is there too. The email boxes hide once you are in.</p>
@@ -264,7 +264,7 @@
       <label class="drift-item"><span><input id="driftReso" type="checkbox"> Resonance</span><input id="wReso" type="range" min="0" max="100" step="1" value="100"><b id="wResoVal">100</b></label>
       <label class="drift-item"><span><input id="driftSwing" type="checkbox" checked> Swing</span><input id="wSwing" type="range" min="0" max="100" step="1" value="100"><b id="wSwingVal">100</b></label>
     </div>
-    <p class="hint">The slider under each switch is how far and how fast autopilot may wander. 100 keeps moving. A low number stays close. Feedback will not climb above 75. Levels, note length, root key, tempo, delay time, drive, and plate tension stay fixed.</p>
+    <p class="hint">Pattern, chord, and muteouts change after 16 bars. The effect knobs move on every step. The slider is how far. Feedback will not climb above 75. Levels, note length, root key, tempo, delay time, drive, and plate tension stay fixed.</p>
   </section>
 
   <footer>

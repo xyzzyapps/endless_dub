@@ -859,69 +859,52 @@ function onBar() {
   $("barCount").textContent = "bar " + state.bar;
   if (!state.autopilot) return;
 
-  const patternEvery = driftEvery(16, state.weight.pattern);
-  if (state.bar % patternEvery === 0 && state.drift.pattern && state.weight.pattern > 0) {
+  if (state.bar % 16 !== 0) return;
+  if (state.drift.pattern && state.weight.pattern > 0) {
     mutatePattern();
     paintGrids();
   }
-  const chordEvery = driftEvery(16, state.weight.chord);
-  if (state.drift.chord && state.weight.chord > 0 && state.holdBars >= state.minHold && state.bar % chordEvery === 0 && Math.random() < 0.65 * state.weight.chord / 100) {
+  if (state.drift.chord && state.weight.chord > 0 && state.holdBars >= state.minHold && Math.random() < 0.65 * state.weight.chord / 100) {
     shiftChord();
   }
-  const breakEvery = driftEvery(32, state.weight.breakdown);
-  if (state.drift.breakdown && state.weight.breakdown > 0 && state.bar % breakEvery === 0 && Math.random() < 0.7 * state.weight.breakdown / 100) {
+  if (state.drift.breakdown && state.weight.breakdown > 0 && Math.random() < 0.7 * state.weight.breakdown / 100) {
     state.breakdown = 4;
   }
 }
 
-function driftEvery(base, weight) {
-  const n = clamp(weight, 0, 100) / 100;
-  return Math.max(2, Math.round(base * (1 - 0.75 * n)));
+function rollSteps(pattern, voice, steps) {
+  const w = state.weight.pattern / 100;
+  steps.forEach((i) => {
+    pattern[i] = Math.random() < w * stepPct(voice, i) ? 1 : 0;
+  });
 }
 
 function mutatePattern() {
-  const w = state.weight.pattern / 100;
-  const hat = state.patterns.hat;
-  if (Math.random() < w) {
-    const i = pickWeighted("hat", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
-    if (i >= 0) hat[i] = hat[i] ? 0 : 1;
-  }
-  if (Math.random() < 0.4 * w) {
-    const open = state.patterns.open;
-    const idx = pickWeighted("open", [2, 6, 10, 14]);
-    if (idx >= 0) {
-      open[idx] = open[idx] ? 0 : 1;
-      if (open.reduce((a, b) => a + b, 0) > 3) open[idx] = 0;
-    }
-  }
-  const stab = state.patterns.stab;
-  if (Math.random() < 0.5 * w) {
-    const idx = pickWeighted("stab", [3, 6, 7, 10, 11, 14]);
-    if (idx >= 0) {
-      stab[idx] = stab[idx] ? 0 : 1;
-      if (stab.reduce((a, b) => a + b, 0) < 2) place(stab, "stab", [3, 6, 10, 14]);
-      if (stab.reduce((a, b) => a + b, 0) > 4) stab[idx] = 0;
-    }
-  }
   const kick = state.patterns.kick;
-  if (Math.random() < 0.4 * w * stepPct("kick", 8)) kick[8] = kick[8] ? 0 : 1;
-  if (stepPct("kick", 0) >= 1) kick[0] = 1;
-  else if (stepPct("kick", 0) <= 0) kick[0] = 0;
+  rollSteps(kick, "kick", [0, 4, 8, 12]);
+  if (!kick[0] && !kick[4] && !kick[8] && !kick[12]) place(kick, "kick", [0, 4, 8, 12]);
+
+  const hat = state.patterns.hat;
+  rollSteps(hat, "hat", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+  hat[0] = 0;
+
+  rollSteps(state.patterns.open, "open", [6, 10, 14]);
+
   const snare = state.patterns.snare;
-  if (stepPct("snare", 4) >= 1) snare[4] = 1;
-  else if (stepPct("snare", 4) <= 0) snare[4] = 0;
-  if (stepPct("snare", 12) >= 1) snare[12] = 1;
-  else if (stepPct("snare", 12) <= 0) snare[12] = 0;
-  if (Math.random() < 0.35 * w * stepPct("snare", 13)) snare[13] = snare[13] ? 0 : 1;
-  if (Math.random() < 0.45 * w) {
-    const plate = state.patterns.plate;
-    const idx = pickWeighted("plate", [2, 7, 10, 11, 15]);
-    if (idx >= 0) {
-      plate[idx] = plate[idx] ? 0 : 1;
-      if (plate.reduce((a, b) => a + b, 0) > 2) plate[idx] = 0;
-    }
-    if (plate.reduce((a, b) => a + b, 0) === 0) place(plate, "plate", [2, 7, 10, 11, 15]);
-  }
+  rollSteps(snare, "snare", [4, 12, 13]);
+  if (!snare[4] && !snare[12]) place(snare, "snare", [4, 12]);
+
+  rollSteps(state.patterns.perc, "perc", [6, 10, 14]);
+
+  const bass = state.patterns.bass;
+  rollSteps(bass, "bass", [0, 6, 7, 8, 10, 14]);
+  if (!bass.some((v) => v)) place(bass, "bass", [0]);
+
+  const stab = state.patterns.stab;
+  rollSteps(stab, "stab", [3, 6, 7, 10, 11, 14]);
+  if (stab.reduce((sum, v) => sum + v, 0) < 2) place(stab, "stab", [3, 6, 10, 14]);
+
+  rollSteps(state.patterns.plate, "plate", [2, 7, 10, 11, 15]);
 }
 
 function shiftChord() {
@@ -1268,12 +1251,29 @@ function paintDrift() {
   $("srsVal").textContent = String(Math.round(state.srs * 100));
 }
 
+function retargetDriftStep() {
+  if (!state.autopilot) return;
+  if (!state.driftTarget) state.driftTarget = {};
+  if (!state.driftHold) state.driftHold = {};
+  const now = ctx ? ctx.currentTime : 0;
+  Object.entries(DRIFT_KNOB).forEach(([key, spec]) => {
+    const weight = state.weight[key] || 0;
+    if (!state.drift[key] || weight <= 0) return;
+    if ((state.driftHold[key] || 0) > now) return;
+    const span = spec.span * clamp(weight, 0, 100) / 100;
+    const cur = spec.get();
+    const lo = clamp(cur - span, spec.min, spec.max);
+    const hi = clamp(cur + span, spec.min, spec.max);
+    const room = Math.max(0, hi - lo);
+    state.driftTarget[key] = room === 0 ? cur : clamp(lo + Math.random() * room, spec.min, spec.max);
+  });
+}
+
 function glideDrift() {
   if (!ctx || !state.playing || !state.autopilot) return;
   const now = ctx.currentTime;
   const dt = Math.min(0.1, Math.max(0.001, now - (state.driftStamp || now)));
   state.driftStamp = now;
-  if (!state.driftAt) state.driftAt = {};
   if (!state.driftTarget) state.driftTarget = {};
   if (!state.driftHold) state.driftHold = {};
   let moved = false;
@@ -1282,18 +1282,9 @@ function glideDrift() {
     if (!state.drift[key] || weight <= 0) return;
     if ((state.driftHold[key] || 0) > now) return;
     const n = clamp(weight, 0, 100) / 100;
-    const span = spec.span * n;
-    if (now >= (state.driftAt[key] || 0)) {
-      const cur = spec.get();
-      const lo = clamp(cur - span, spec.min, spec.max);
-      const hi = clamp(cur + span, spec.min, spec.max);
-      const room = Math.max(0, hi - lo);
-      state.driftTarget[key] = room === 0 ? cur : clamp(lo + Math.random() * room, spec.min, spec.max);
-      state.driftAt[key] = now + 0.35 + (1 - n) * (1.2 + Math.random() * 5);
-    }
     const cur = spec.get();
     const target = state.driftTarget[key] == null ? cur : state.driftTarget[key];
-    const next = cur + (target - cur) * (1 - Math.exp(-dt * (0.45 + Math.pow(n, 1.4) * 8)));
+    const next = cur + (target - cur) * (1 - Math.exp(-dt * (2 + n * 24)));
     if (Math.abs(next - cur) > 1e-5) {
       spec.set(next);
       moved = true;
@@ -1313,6 +1304,7 @@ function scheduler() {
   const horizon = ctx.currentTime + 0.12;
   const sixteenth = (60 / state.bpm) / 4;
   while (state.nextTime < horizon) {
+    retargetDriftStep();
     playStep(state.step, state.nextTime);
     state.nextTime += sixteenth;
     state.step = (state.step + 1) % 16;
@@ -1434,6 +1426,10 @@ function paintPlayhead() {
 function draw(now) {
   requestAnimationFrame(draw);
   if (window.CsoundDub && CsoundDub.on && state.playing) {
+    if (state.csoundDriftStep !== CsoundDub.step) {
+      state.csoundDriftStep = CsoundDub.step;
+      retargetDriftStep();
+    }
     glideCutoff();
     glideDrift();
   }
