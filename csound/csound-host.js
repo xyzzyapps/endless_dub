@@ -9,10 +9,13 @@ let csound = null;
 let poll = 0;
 
 
-function impulseTables() {
-  const length = 48000 * 3.2;
-  const left = new Float32Array(262144);
-  const right = new Float32Array(262144);
+const IR_SECONDS = 1.6;
+const IR_TABLE = 262144;
+
+function impulseTables(sampleRate) {
+  const length = Math.min(IR_TABLE - 1, Math.floor(sampleRate * IR_SECONDS));
+  const left = new Float32Array(IR_TABLE);
+  const right = new Float32Array(IR_TABLE);
   let power = 0;
   for (let i = 0; i < length; i++) {
     const decay = Math.pow(1 - i / length, 2.4);
@@ -27,7 +30,17 @@ function impulseTables() {
     left[i] *= scale;
     right[i] *= scale;
   }
-  return [left, right];
+  return [left, right, length];
+}
+
+function phoneOrchestra(orc, sampleRate, irLen) {
+  const next = orc
+    .replace(/^sr\s*=\s*\d+\s*$/m, "sr = " + sampleRate)
+    .replace(/^giIrLen\s+init\s+\d+\s*$/m, "giIrLen init " + irLen);
+  if (!next.includes("sr = " + sampleRate) || !next.includes("giIrLen init " + irLen)) {
+    throw new Error("Phone orchestra could not take the device sample rate");
+  }
+  return next;
 }
 
 function mask(row) {
@@ -74,7 +87,9 @@ async function push(state) {
 
 async function boot(state) {
   if (csound) return;
-  const context = new AudioContext();
+  const context = new AudioContext({ latencyHint: "playback" });
+  const sampleRate = context.sampleRate;
+  const irLen = Math.min(IR_TABLE - 1, Math.floor(sampleRate * IR_SECONDS));
   csound = await Csound({
     audioContext: context,
     outputChannelCount: 2,
@@ -84,12 +99,14 @@ async function boot(state) {
   const messages = [];
   csound.on("message", (msg) => messages.push(String(msg)));
   await csound.setOption("-odac");
+  await csound.setOption("--sample-rate=" + sampleRate);
   const build = (document.querySelector('meta[name="build"]') || {}).content || "";
   const orcUrl = new URL("./graph.orc" + (build && build !== "dev" ? "?v=" + build : ""), import.meta.url);
-  const orc = await (await fetch(orcUrl)).text();
+  const orc = phoneOrchestra(await (await fetch(orcUrl)).text(), sampleRate, irLen);
   const compiled = await csound.compileOrc(orc);
   if (compiled !== 0) throw new Error(messages.join("\n") || ("Csound orchestra did not compile (" + compiled + ")"));
-  const [left, right] = impulseTables();
+  const [left, right, copied] = impulseTables(sampleRate);
+  if (copied !== irLen) throw new Error("Phone reverb length does not match the orchestra");
   await csound.tableCopyIn("20", left);
   await csound.tableCopyIn("21", right);
   await csound.readScore("i 1 0 86400\ni 99 0 86400\n");

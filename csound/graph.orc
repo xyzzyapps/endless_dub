@@ -12,7 +12,7 @@ gkHit init 0
 giTri ftgen 1, 0, 4096, 7, 0, 1024, 1, 2048, -1, 1024, 0
 giIrL ftgen 20, 0, 262144, 2, 0
 giIrR ftgen 21, 0, 262144, 2, 0
-giIrLen init 153600
+giIrLen init 76800
 
 instr 1
   kPlay chnget "playing"
@@ -389,8 +389,8 @@ DUCK:
   aDelayR = (aDelL * 0.195 + aDelR * 0.981) * 0.85
   aWet = gaRev * kRev * 0.7
   aWet butterlp aWet, 2800
-  aRevL ftconv aWet, giIrL, 2048, 0, giIrLen
-  aRevR ftconv aWet, giIrR, 2048, 0, giIrLen
+  aRevL ftconv aWet, giIrL, 8192, 0, giIrLen
+  aRevR ftconv aWet, giIrR, 8192, 0, giIrLen
   aRevL = aRevL * 0.9
   aRevR = aRevR * 0.9
   kLift = 1.4
