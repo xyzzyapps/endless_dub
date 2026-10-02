@@ -29,9 +29,8 @@ jobs:
           sed -e "s/content=\"dev\"/content=\"$sha\"/" \
               -e "s/href=\"style.css\"/href=\"style.css?v=$sha\"/" \
               -e "s/src=\"app.js\"/src=\"app.js?v=$sha\"/" \
-              -e "s/src=\"engine-host.js\"/src=\"engine-host.js?v=$sha\"/" \
               index.html > public/index.html
-          cp app.js engine-host.js engine-worklet.js style.css preview.png favicon.svg public/
+          cp app.js style.css preview.png favicon.svg public/
           printf '%s\n' "$sha" > public/version.txt
       - uses: actions/upload-pages-artifact@v3
         with:
