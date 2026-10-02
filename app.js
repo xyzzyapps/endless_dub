@@ -186,11 +186,26 @@ function fillChordSelect() {
   sel.value = state.chord;
 }
 
-const STEP_CURVE = [100, 35, 55, 30, 85, 40, 60, 30, 90, 35, 55, 30, 85, 40, 70, 30];
+const SEED = {
+  kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+  hat:  [0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0],
+  open: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+  snare:[0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+  perc: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+  bass: [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
+  stab: [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+  plate:[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+};
+
+const SEED_HIT = 92;
+
+function weightsFromPattern(pattern) {
+  return Array.from({ length: 16 }, (_, i) => (pattern && pattern[i] ? SEED_HIT : 0));
+}
 
 function fillStepWeights() {
   ROWS.forEach((row) => {
-    state.stepWeight[row.id] = STEP_CURVE.slice();
+    state.stepWeight[row.id] = weightsFromPattern(SEED[row.id]);
   });
 }
 
@@ -211,16 +226,10 @@ function makePattern() {
 }
 
 function seedPattern() {
-  state.patterns = {
-    kick: [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
-    hat:  [0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0],
-    open: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-    snare:[0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-    perc: [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-    bass: [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0],
-    stab: [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-    plate:[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-  };
+  state.patterns = {};
+  ROWS.forEach((row) => {
+    state.patterns[row.id] = SEED[row.id].slice();
+  });
 }
 
 function renderGrids() {
@@ -1704,8 +1713,8 @@ function bits16(row) {
   return out;
 }
 
-function weights16(row, asPercent) {
-  const out = STEP_CURVE.slice();
+function weights16(row, asPercent, pattern) {
+  const out = weightsFromPattern(pattern);
   if (!Array.isArray(row)) return out;
   for (let i = 0; i < 16; i++) {
     const n = clampNum(row[i], 0, asPercent ? 100 : 1, asPercent ? out[i] : out[i] / 100);
@@ -1720,7 +1729,7 @@ function cleanSnapshot(data) {
   const stepWeight = {};
   ROWS.forEach((row) => {
     patterns[row.id] = bits16(src.patterns && src.patterns[row.id]);
-    stepWeight[row.id] = weights16(src.stepWeight && src.stepWeight[row.id], !!src.stepWeightPercent);
+    stepWeight[row.id] = weights16(src.stepWeight && src.stepWeight[row.id], !!src.stepWeightPercent, patterns[row.id]);
   });
   const delays = [0.375, 0.5, 0.75, 1, 1.5];
   const delayBeats = delays.includes(Number(src.delayBeats)) ? Number(src.delayBeats) : 0.75;
