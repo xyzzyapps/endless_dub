@@ -1501,7 +1501,7 @@ function scheduler() {
   glideCutoff();
   glideDrift();
   if (!state.playing) return;
-  const horizon = ctx.currentTime + 0.12;
+  const horizon = ctx.currentTime + 0.2;
   const sixteenth = (60 / state.bpm) / 4;
   while (state.nextTime < horizon) {
     retargetDriftStep();
