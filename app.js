@@ -114,10 +114,6 @@ let delayL, delayR, fbL, fbR, dampL, dampR;
 let comp, shaper, analyser, srsSide;
 let noiseBuf;
 let stabBuf;
-let stabWetBuf = null;
-let stabWetTimer = 0;
-let stabWetGen = 0;
-let reverbImpulse = null;
 let rimBuf;
 let plateCache = null;
 let mobileVoices = null;
@@ -910,6 +906,7 @@ function playStab(t) {
   f2.connect(g);
   g.connect(musicBus);
   g.connect(delaySend);
+  g.connect(reverbSend);
   const ref = midiToHz(STAB_REF);
   notes.forEach((n, idx) => {
     const src = ctx.createBufferSource();
@@ -920,74 +917,7 @@ function playStab(t) {
     src.start(t);
     src.stop(t + decay + 0.08);
   });
-  if (stabWetBuf) {
-    const wet = ctx.createGain();
-    wet.gain.value = peak * state.reverb * 0.7 * 0.9;
-    wet.connect(duck);
-    notes.forEach((n, idx) => {
-      const src = ctx.createBufferSource();
-      src.buffer = stabWetBuf;
-      const rate = Math.max(0.05, midiToHz(n) / ref);
-      src.playbackRate.setValueAtTime(rate, t);
-      src.detune.setValueAtTime((idx - 1) * 2, t);
-      src.connect(wet);
-      src.start(t);
-      src.stop(t + stabWetBuf.duration / rate + 0.02);
-    });
-  } else {
-    g.connect(reverbSend);
-  }
   noiseBurst(t, 0.06, "bandpass", 900, 0.8, 0.05, delaySend);
-}
-
-function queueStabWet() {
-  if (!ctx || !reverbImpulse || !stabBuf) return;
-  clearTimeout(stabWetTimer);
-  stabWetTimer = setTimeout(renderStabWet, 180);
-}
-
-function renderStabWet() {
-  if (!ctx || !reverbImpulse || !stabBuf) return;
-  const gen = ++stabWetGen;
-  const rate = ctx.sampleRate;
-  const decay = Math.max(0.02, state.decay);
-  const dur = decay + 0.08 + 3.2;
-  const offline = new OfflineAudioContext(2, Math.ceil(rate * dur), rate);
-  const src = offline.createBufferSource();
-  src.buffer = stabBuf;
-  const start = Math.min(4200, state.cutoff * (2.4 + state.reso / 10));
-  const f1 = offline.createBiquadFilter();
-  const f2 = offline.createBiquadFilter();
-  f1.type = "lowpass";
-  f2.type = "lowpass";
-  f1.frequency.setValueAtTime(Math.max(80, start), 0);
-  f1.frequency.exponentialRampToValueAtTime(Math.max(80, state.cutoff * 0.55), decay);
-  f2.frequency.setValueAtTime(Math.max(90, start * 0.85), 0);
-  f2.frequency.exponentialRampToValueAtTime(Math.max(90, state.cutoff * 0.45), decay);
-  f1.Q.setValueAtTime(0.4 + state.reso / 10, 0);
-  f2.Q.value = 0.6;
-  const g = offline.createGain();
-  const level = 1;
-  g.gain.setValueAtTime(0.0001, 0);
-  g.gain.exponentialRampToValueAtTime(level, 0.008);
-  g.gain.setValueAtTime(level, 0.028);
-  g.gain.exponentialRampToValueAtTime(0.0001, 0.028 + decay);
-  const pre = offline.createBiquadFilter();
-  pre.type = "lowpass";
-  pre.frequency.value = 2800;
-  const conv = offline.createConvolver();
-  conv.buffer = reverbImpulse;
-  src.connect(f1);
-  f1.connect(f2);
-  f2.connect(g);
-  g.connect(pre);
-  pre.connect(conv);
-  conv.connect(offline.destination);
-  src.start(0);
-  src.stop(decay + 0.08);
-  offline.startRendering().then((buf) => {
-    if (gen === stabWetGen) stabWetBuf = buf;
-  }).catch(() => {});
 }
 
 function buildGraph() {
@@ -1062,21 +992,20 @@ function buildGraph() {
   buildReverb();
   applyParams();
   if (isMobile()) buildMobileVoices();
-  renderStabWet();
 }
 
 function buildReverb() {
   const len = Math.floor(ctx.sampleRate * 3.2);
-  reverbImpulse = ctx.createBuffer(2, len, ctx.sampleRate);
+  const impulse = ctx.createBuffer(2, len, ctx.sampleRate);
   for (let c = 0; c < 2; c++) {
-    const d = reverbImpulse.getChannelData(c);
+    const d = impulse.getChannelData(c);
     for (let i = 0; i < len; i++) {
       const decay = Math.pow(1 - i / len, 2.4);
       d[i] = (Math.random() * 2 - 1) * decay;
     }
   }
   const conv = ctx.createConvolver();
-  conv.buffer = reverbImpulse;
+  conv.buffer = impulse;
   const pre = ctx.createBiquadFilter();
   pre.type = "lowpass";
   pre.frequency.value = 2800;
@@ -1205,8 +1134,6 @@ function onBar() {
   if (!state.autopilot) return;
 
   const phrase = phraseLength();
-  const lead = Math.min(4, phrase - 1);
-  if (state.bar % phrase === phrase - lead) renderStabWet();
   if (state.bar % phrase !== 0) return;
   if (state.drift.pattern && Math.random() < state.weight.pattern / 100) {
     makePattern();
@@ -1922,10 +1849,9 @@ function wire() {
     state.cutoff = v;
     state.cutoffTarget = v;
     if (ctx) state.cutoffRetarget = ctx.currentTime + 2;
-    queueStabWet();
   }, (v) => String(Math.round(v)));
-  bindSlider("reso", "resoVal", pct("reso"), (v) => { state.reso = v; holdDrift("reso"); queueStabWet(); }, asPct("reso"));
-  bindSlider("decay", "decayVal", ms, (v) => { state.decay = v / 1000; holdDrift("decay"); queueStabWet(); }, (v) => String(Math.round(v)));
+  bindSlider("reso", "resoVal", pct("reso"), (v) => { state.reso = v; holdDrift("reso"); }, asPct("reso"));
+  bindSlider("decay", "decayVal", ms, (v) => { state.decay = v / 1000; holdDrift("decay"); }, (v) => String(Math.round(v)));
   bindSlider("send", "sendVal", (el) => Number(el.value), (v) => { state.send = v / 100; holdDrift("send"); }, (v) => String(Math.round(v)));
   bindSlider("feedback", "feedbackVal", ms, (v) => { state.feedback = v / 100; holdDrift("feedback"); }, (v) => String(Math.round(v)));
   bindSlider("damp", "dampVal", pct("damp"), (v) => { state.damp = v; holdDrift("damp"); }, asPct("damp"));
