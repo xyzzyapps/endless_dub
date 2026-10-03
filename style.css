@@ -16,6 +16,7 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  color-scheme: dark;
   scrollbar-width: thin;
   scrollbar-color: var(--accent) var(--bg);
 }
@@ -209,7 +210,53 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 0;
 }
 
-input[type="checkbox"] { accent-color: var(--accent); }
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin: 0 4px 0 0;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  display: inline-grid;
+  place-content: center;
+  vertical-align: -2px;
+  cursor: pointer;
+}
+input[type="checkbox"]::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-left: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  transform: translateY(-1px) rotate(-45deg);
+}
+input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--glow);
+}
+input[type="checkbox"]:checked::after {
+  border-left-color: var(--bg);
+  border-bottom-color: var(--bg);
+}
+input[type="checkbox"]:focus-visible {
+  outline: 1px solid var(--glow);
+  outline-offset: 2px;
+}
+input[type="number"] {
+  font: inherit;
+  color: var(--glow);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  width: 4.4em;
+  padding: 4px 6px;
+}
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 input[type="color"] {
   width: 36px;
   height: 22px;
@@ -234,7 +281,18 @@ select {
   background: var(--bg);
   border: 1px solid var(--line);
   border-radius: 0;
-  padding: 4px 6px;
+  padding: 4px 22px 4px 6px;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--accent) 50%),
+    linear-gradient(135deg, var(--accent) 50%, transparent 50%);
+  background-position: calc(100% - 13px) 55%, calc(100% - 8px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+select option {
+  color: var(--ink);
+  background: var(--bg);
 }
 
 .readout span, label span {
