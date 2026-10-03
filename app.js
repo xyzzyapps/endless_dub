@@ -881,7 +881,7 @@ function playStab(t) {
 }
 
 function buildGraph() {
-  ctx = isMobile() ? new AudioContext({ latencyHint: "playback" }) : new AudioContext();
+  ctx = isMobile() ? new AudioContext({ latencyHint: "playback", sampleRate: 44100 }) : new AudioContext();
   noiseBuf = noiseBuffer();
 
   drumBus = ctx.createGain();
