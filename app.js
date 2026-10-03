@@ -113,6 +113,8 @@ let delayL, delayR, fbL, fbR, dampL, dampR;
 let comp, shaper, analyser, srsSide;
 let noiseBuf;
 let stabBuf;
+let rimBuf;
+let plateCache = null;
 let mobileVoices = null;
 let timer;
 let recorder = null;
@@ -310,6 +312,38 @@ function noiseBuffer() {
 }
 
 const STAB_REF = 60;
+const PLATE_REF = 293.66;
+
+function envAt(t, attack, hold, release, peak) {
+  const level = Math.max(0.0001, peak);
+  if (t < attack) return 0.0001 * Math.pow(level / 0.0001, t / Math.max(0.0001, attack));
+  if (t < attack + hold) return level;
+  const rel = Math.max(0.0001, release);
+  if (t < attack + hold + rel) return level * Math.pow(0.0001 / level, (t - attack - hold) / rel);
+  return 0;
+}
+
+function bandpass(freq, q, rate) {
+  const w0 = 2 * Math.PI * freq / rate;
+  const alpha = Math.sin(w0) / (2 * q);
+  const a0 = 1 + alpha;
+  return {
+    b0: alpha / a0,
+    b2: -alpha / a0,
+    a1: -2 * Math.cos(w0) / a0,
+    a2: (1 - alpha) / a0,
+    x1: 0, x2: 0, y1: 0, y2: 0,
+  };
+}
+
+function bandpassStep(f, x) {
+  const y = f.b0 * x + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
+  f.x2 = f.x1;
+  f.x1 = x;
+  f.y2 = f.y1;
+  f.y1 = y;
+  return y;
+}
 
 function stabSample() {
   const rate = ctx.sampleRate;
@@ -327,6 +361,56 @@ function stabSample() {
       s += phase[k] * 2 - 1;
     }
     d[i] = s / 3;
+  }
+  return buf;
+}
+
+function rimSample() {
+  const rate = ctx.sampleRate;
+  const len = Math.floor(rate * 0.45);
+  const buf = ctx.createBuffer(1, len, rate);
+  const d = buf.getChannelData(0);
+  const bp = bandpass(1800, 1.2, rate);
+  let p0 = 0;
+  let p1 = 0;
+  for (let i = 0; i < len; i++) {
+    const t = i / rate;
+    p0 += 380 / rate;
+    p1 += 640 / rate;
+    const tri = (p) => 1 - 4 * Math.abs((p % 1) - 0.5);
+    let s = tri(p0) * 0.18 + tri(p1) * 0.1;
+    if (t < 0.09) s += bandpassStep(bp, Math.random() * 2 - 1) * envAt(t, 0.002, 0, 0.04, 0.08);
+    d[i] = s;
+  }
+  return buf;
+}
+
+function plateSample(ring, order) {
+  const rate = ctx.sampleRate;
+  const len = Math.floor(rate * (ring + 0.06));
+  const buf = ctx.createBuffer(1, len, rate);
+  const d = buf.getChannelData(0);
+  const fundamental = Math.sqrt(5);
+  const modes = PLATE_MODES.slice(0, order).map(([m, n], i) => {
+    const ratio = Math.sqrt(m * m + n * n) / fundamental;
+    return {
+      freq: Math.min(PLATE_REF * ratio, 12000),
+      decay: ring / ratio,
+      amp: 1 / (1 + i * 0.45),
+      phase: 0,
+    };
+  });
+  const bp = bandpass(Math.min(PLATE_REF * 3, 8000), 1.4, rate);
+  for (let i = 0; i < len; i++) {
+    const t = i / rate;
+    let s = 0;
+    for (let k = 0; k < modes.length; k++) {
+      const mode = modes[k];
+      s += Math.sin(mode.phase) * envAt(t, 0.002, 0, mode.decay, mode.amp);
+      mode.phase += 2 * Math.PI * mode.freq / rate;
+    }
+    if (t < 0.09) s += bandpassStep(bp, Math.random() * 2 - 1) * envAt(t, 0.002, 0, 0.025, 2.2);
+    d[i] = s;
   }
   return buf;
 }
@@ -620,15 +704,13 @@ function playSnare(t) {
 }
 
 function playRim(t) {
-  [380, 640].forEach((freq, i) => {
-    const o = ctx.createOscillator();
-    o.type = "triangle";
-    o.frequency.setValueAtTime(freq, t);
-    const g = envGain(t, 0.001, 0, state.len.rim, (i === 0 ? 0.18 : 0.1) * state.lvl.rim);
-    o.connect(g); g.connect(drumBus);
-    o.start(t); o.stop(t + state.len.rim + 0.03);
-  });
-  noiseBurst(t, Math.min(0.04, state.len.rim), "bandpass", 1800, 1.2, 0.08 * state.lvl.rim, drumBus);
+  const src = ctx.createBufferSource();
+  src.buffer = rimBuf;
+  const g = envGain(t, 0.001, 0, state.len.rim, state.lvl.rim);
+  src.connect(g);
+  g.connect(drumBus);
+  src.start(t);
+  src.stop(t + state.len.rim + 0.03);
 }
 
 function playBass(t, step) {
@@ -841,6 +923,8 @@ function buildGraph() {
   ctx = isMobile() ? new AudioContext({ latencyHint: "playback", sampleRate: 44100 }) : new AudioContext();
   noiseBuf = noiseBuffer();
   stabBuf = stabSample();
+  rimBuf = rimSample();
+  plateCache = null;
 
   drumBus = ctx.createGain();
   musicBus = ctx.createGain();
@@ -1006,27 +1090,23 @@ function applyParams() {
 function playPlate(t) {
   const f0 = midiToHz(state.root + 12) * state.plate.tension;
   const ring = state.plate.ring;
-  const amp = 0.07 * state.lvl.plate;
-  const order = state.plate.order;
-  const fundamental = Math.sqrt(1 + 4);
-  PLATE_MODES.slice(0, order).forEach(([m, n], i) => {
-    const ratio = Math.sqrt(m * m + n * n) / fundamental;
-    const freq = Math.min(f0 * ratio, 12000);
-    const o = ctx.createOscillator();
-    o.type = "sine";
-    o.frequency.setValueAtTime(freq, t);
-    const g = envGain(t, 0.002, 0, ring / ratio, amp / (1 + i * 0.45));
-    o.connect(g);
-    g.connect(musicBus);
-    g.connect(reverbSend);
-    const send = ctx.createGain();
-    send.gain.value = 0.35;
-    g.connect(send);
-    send.connect(delaySend);
-    o.start(t);
-    o.stop(t + ring / ratio + 0.05);
-  });
-  noiseBurst(t, 0.025, "bandpass", Math.min(f0 * 3, 8000), 1.4, amp * 2.2, musicBus);
+  const order = clamp(Math.round(state.plate.order), 2, 10);
+  const key = ctx.sampleRate + ":" + order + ":" + Math.round(ring * 1000);
+  if (!plateCache || plateCache.key !== key) plateCache = { key, buf: plateSample(ring, order) };
+  const src = ctx.createBufferSource();
+  src.buffer = plateCache.buf;
+  src.playbackRate.setValueAtTime(Math.max(0.05, f0 / PLATE_REF), t);
+  const g = ctx.createGain();
+  g.gain.value = 0.07 * state.lvl.plate;
+  src.connect(g);
+  g.connect(musicBus);
+  g.connect(reverbSend);
+  const send = ctx.createGain();
+  send.gain.value = 0.35;
+  g.connect(send);
+  send.connect(delaySend);
+  src.start(t);
+  src.stop(t + (ring + 0.06) / Math.max(0.05, f0 / PLATE_REF) + 0.02);
 }
 
 function playStep(step, t) {
@@ -1561,9 +1641,6 @@ function drawPlate(now) {
   c.putImageData(img, 0, 0);
 }
 
-let plateFrame = 0;
-let phoneDrawAt = 0;
-
 let shownCol = -1;
 
 function paintPlayhead() {
@@ -1593,13 +1670,8 @@ function draw(now) {
     glideDrift();
   }
   paintPlayhead();
-  plateFrame += 1;
   const stamp = now || performance.now();
-  const slowPhone = isMobile() && state.playing && !recording;
-  if (slowPhone && stamp - phoneDrawAt < 250) return;
-  if (slowPhone) phoneDrawAt = stamp;
-  const phone = window.innerWidth < 800;
-  if (!phone || plateFrame % 2 === 0 || recording) drawPlate(stamp);
+  drawPlate(stamp);
   if (recording && recordCtx) {
     recordCtx.drawImage($("plate"), 0, 0, recordCanvas.width, recordCanvas.height);
   }
