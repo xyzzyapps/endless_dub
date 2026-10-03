@@ -112,6 +112,7 @@ let ctx, master, drumBus, musicBus, duck, delaySend, reverbSend;
 let delayL, delayR, fbL, fbR, dampL, dampR;
 let comp, shaper, analyser, srsSide;
 let noiseBuf;
+let stabBuf;
 let mobileVoices = null;
 let timer;
 let recorder = null;
@@ -308,6 +309,28 @@ function noiseBuffer() {
   return buf;
 }
 
+const STAB_REF = 60;
+
+function stabSample() {
+  const rate = ctx.sampleRate;
+  const len = Math.floor(rate * 1);
+  const buf = ctx.createBuffer(1, len, rate);
+  const d = buf.getChannelData(0);
+  const hz = midiToHz(STAB_REF);
+  const freqs = [-7, 0, 6].map((cents) => hz * Math.pow(2, cents / 1200));
+  const phase = [0, 0, 0];
+  for (let i = 0; i < len; i++) {
+    let s = 0;
+    for (let k = 0; k < 3; k++) {
+      phase[k] += freqs[k] / rate;
+      if (phase[k] >= 1) phase[k] -= 1;
+      s += phase[k] * 2 - 1;
+    }
+    d[i] = s / 3;
+  }
+  return buf;
+}
+
 function envGain(t, attack, hold, release, peak) {
   const g = ctx.createGain();
   const level = Math.max(0.0001, peak);
@@ -462,48 +485,12 @@ function makeBassVoice() {
   return { o, sub, g, g2, freeAt: 0 };
 }
 
-function makeStabVoice() {
-  const notes = [];
-  for (let idx = 0; idx < 4; idx++) {
-    notes.push([-7, 0, 6].map((cents) => {
-      const o = ctx.createOscillator();
-      o.type = "sawtooth";
-      o.detune.value = cents + (idx - 1) * 2;
-      const f1 = ctx.createBiquadFilter();
-      const f2 = ctx.createBiquadFilter();
-      f1.type = "lowpass";
-      f2.type = "lowpass";
-      f2.Q.value = 0.6;
-      const g = silentGain();
-      o.connect(f1);
-      f1.connect(f2);
-      f2.connect(g);
-      g.connect(musicBus);
-      g.connect(delaySend);
-      g.connect(reverbSend);
-      o.start();
-      return { o, f1, f2, g };
-    }));
-  }
-  const src = loopNoise();
-  const f = ctx.createBiquadFilter();
-  f.type = "bandpass";
-  f.frequency.value = 900;
-  f.Q.value = 0.8;
-  const ng = silentGain();
-  src.connect(f);
-  f.connect(ng);
-  ng.connect(delaySend);
-  return { notes, ng, freeAt: 0 };
-}
-
 function buildMobileVoices() {
   mobileVoices = {
     kick: [makeKickVoice(), makeKickVoice()],
     hat: [makeHatVoice(), makeHatVoice(), makeHatVoice(), makeHatVoice()],
     snare: [makeSnareVoice(), makeSnareVoice()],
     bass: [makeBassVoice(), makeBassVoice(), makeBassVoice()],
-    stab: [makeStabVoice(), makeStabVoice()],
   };
 }
 
@@ -578,37 +565,6 @@ function fireBass(t, step) {
   v.sub.frequency.setValueAtTime(midiToHz(note - 12), when);
   retrigger(v.g.gain, when, 0.012, 0.05, state.len.bass, 0.55 * state.bassLvl);
   retrigger(v.g2.gain, when, 0.02, 0.08, state.len.bass * 1.15, 0.45 * state.bassLvl);
-}
-
-function fireStab(t) {
-  const when = whenDue(t);
-  const v = takeVoice(mobileVoices.stab);
-  const notes = stabNotes();
-  const peak = 0.11 * state.lvl.stab;
-  const start = Math.min(4200, state.cutoff * (2.4 + state.reso / 10));
-  const end1 = Math.max(80, state.cutoff * 0.55);
-  const end2 = Math.max(90, state.cutoff * 0.45);
-  const q = 0.4 + state.reso / 10;
-  const decay = Math.max(0.02, state.decay);
-  v.freeAt = when + decay + 0.08;
-  notes.forEach((n, idx) => {
-    const hz = midiToHz(n);
-    v.notes[idx].forEach((part) => {
-      part.o.frequency.cancelScheduledValues(when);
-      part.o.frequency.setValueAtTime(hz, when);
-      const f1 = part.f1.frequency;
-      f1.cancelScheduledValues(when);
-      f1.setValueAtTime(Math.max(80, start), when);
-      f1.exponentialRampToValueAtTime(end1, when + decay);
-      const f2 = part.f2.frequency;
-      f2.cancelScheduledValues(when);
-      f2.setValueAtTime(Math.max(90, start * 0.85), when);
-      f2.exponentialRampToValueAtTime(end2, when + decay);
-      part.f1.Q.setValueAtTime(q, when);
-      retrigger(part.g.gain, when, 0.008, 0.02, decay, peak);
-    });
-  });
-  retrigger(v.ng.gain, when, 0.002, 0, 0.06, 0.05);
 }
 
 function playKick(t) {
@@ -848,34 +804,35 @@ function renderMarkov() {
 }
 
 function playStab(t) {
-  if (mobileVoices) return fireStab(t);
   const notes = stabNotes();
-  const peak = 0.11 * state.lvl.stab;
+  const peak = 0.33 * state.lvl.stab;
+  const decay = Math.max(0.02, state.decay);
+  const start = Math.min(4200, state.cutoff * (2.4 + state.reso / 10));
+  const f1 = ctx.createBiquadFilter();
+  const f2 = ctx.createBiquadFilter();
+  f1.type = "lowpass";
+  f2.type = "lowpass";
+  f1.frequency.setValueAtTime(Math.max(80, start), t);
+  f1.frequency.exponentialRampToValueAtTime(Math.max(80, state.cutoff * 0.55), t + decay);
+  f2.frequency.setValueAtTime(Math.max(90, start * 0.85), t);
+  f2.frequency.exponentialRampToValueAtTime(Math.max(90, state.cutoff * 0.45), t + decay);
+  f1.Q.setValueAtTime(0.4 + state.reso / 10, t);
+  f2.Q.value = 0.6;
+  const g = envGain(t, 0.008, 0.02, decay, peak);
+  f1.connect(f2);
+  f2.connect(g);
+  g.connect(musicBus);
+  g.connect(delaySend);
+  g.connect(reverbSend);
+  const ref = midiToHz(STAB_REF);
   notes.forEach((n, idx) => {
-    [-7, 0, 6].forEach((cents) => {
-      const o = ctx.createOscillator();
-      o.type = "sawtooth";
-      o.frequency.setValueAtTime(midiToHz(n), t);
-      o.detune.setValueAtTime(cents + (idx - 1) * 2, t);
-      const f1 = ctx.createBiquadFilter();
-      const f2 = ctx.createBiquadFilter();
-      f1.type = "lowpass";
-      f2.type = "lowpass";
-      const start = Math.min(4200, state.cutoff * (2.4 + state.reso / 10));
-      f1.frequency.setValueAtTime(start, t);
-      f1.frequency.exponentialRampToValueAtTime(Math.max(80, state.cutoff * 0.55), t + state.decay);
-      f2.frequency.setValueAtTime(start * 0.85, t);
-      f2.frequency.exponentialRampToValueAtTime(Math.max(90, state.cutoff * 0.45), t + state.decay);
-      f1.Q.setValueAtTime(0.4 + state.reso / 10, t);
-      f2.Q.value = 0.6;
-      const g = envGain(t, 0.008, 0.02, state.decay, peak);
-      o.connect(f1); f1.connect(f2); f2.connect(g);
-      g.connect(musicBus);
-      g.connect(delaySend);
-      g.connect(reverbSend);
-      o.start(t);
-      o.stop(t + state.decay + 0.08);
-    });
+    const src = ctx.createBufferSource();
+    src.buffer = stabBuf;
+    src.playbackRate.setValueAtTime(midiToHz(n) / ref, t);
+    src.detune.setValueAtTime((idx - 1) * 2, t);
+    src.connect(f1);
+    src.start(t);
+    src.stop(t + decay + 0.08);
   });
   noiseBurst(t, 0.06, "bandpass", 900, 0.8, 0.05, delaySend);
 }
@@ -883,6 +840,7 @@ function playStab(t) {
 function buildGraph() {
   ctx = isMobile() ? new AudioContext({ latencyHint: "playback", sampleRate: 44100 }) : new AudioContext();
   noiseBuf = noiseBuffer();
+  stabBuf = stabSample();
 
   drumBus = ctx.createGain();
   musicBus = ctx.createGain();
