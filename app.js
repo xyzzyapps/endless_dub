@@ -204,13 +204,26 @@ const SEED = {
 
 const SEED_HIT = 92;
 
-function weightsFromPattern(pattern) {
-  return Array.from({ length: 16 }, (_, i) => (pattern && pattern[i] ? SEED_HIT : 0));
+const EXTRA_WEIGHT = {
+  hat: { 4: 34, 8: 28, 15: 30 },
+  open: { 6: 28, 10: 26 },
+  snare: { 7: 30, 14: 26 },
+  stab: { 7: 32, 11: 28 },
+};
+
+function weightsFromPattern(pattern, id) {
+  const row = Array.from({ length: 16 }, (_, i) => (pattern && pattern[i] ? SEED_HIT : 0));
+  const extra = EXTRA_WEIGHT[id];
+  if (!extra) return row;
+  Object.entries(extra).forEach(([step, weight]) => {
+    if (!row[step]) row[step] = weight;
+  });
+  return row;
 }
 
 function fillStepWeights() {
   ROWS.forEach((row) => {
-    state.stepWeight[row.id] = weightsFromPattern(SEED[row.id]);
+    state.stepWeight[row.id] = weightsFromPattern(SEED[row.id], row.id);
   });
 }
 
@@ -2032,8 +2045,8 @@ function bits16(row) {
   return out;
 }
 
-function weights16(row, asPercent, pattern) {
-  const out = weightsFromPattern(pattern);
+function weights16(row, asPercent, pattern, id) {
+  const out = weightsFromPattern(pattern, id);
   if (!Array.isArray(row)) return out;
   for (let i = 0; i < 16; i++) {
     const n = clampNum(row[i], 0, asPercent ? 100 : 1, asPercent ? out[i] : out[i] / 100);
@@ -2048,7 +2061,7 @@ function cleanSnapshot(data) {
   const stepWeight = {};
   ROWS.forEach((row) => {
     patterns[row.id] = bits16(src.patterns && src.patterns[row.id]);
-    stepWeight[row.id] = weights16(src.stepWeight && src.stepWeight[row.id], !!src.stepWeightPercent, patterns[row.id]);
+    stepWeight[row.id] = weights16(src.stepWeight && src.stepWeight[row.id], !!src.stepWeightPercent, patterns[row.id], row.id);
   });
   const delays = [0.375, 0.5, 0.75, 1, 1.5];
   const delayBeats = delays.includes(Number(src.delayBeats)) ? Number(src.delayBeats) : 0.75;
