@@ -205,11 +205,52 @@ const SEED = {
 const SEED_HIT = 92;
 
 const EXTRA_WEIGHT = {
-  hat: { 4: 34, 8: 28, 15: 30 },
+  hat: { 4: 52, 7: 40, 8: 46, 15: 48 },
   open: { 6: 28, 10: 26 },
-  snare: { 7: 30, 14: 26 },
-  stab: { 7: 32, 11: 28 },
+  snare: { 3: 38, 7: 50, 14: 46 },
+  stab: { 2: 42, 6: 48, 7: 44, 11: 50, 14: 40 },
 };
+
+// Voicings dub techno actually sits on: minor, minor 7, minor 9, open fifth, sus.
+// Indexes match SHAPES. Major stays out of the opening loop.
+const OPENING_LOOPS = [
+  [3, 1, 5],
+  [1, 5, 0],
+  [3, 4, 1],
+  [0, 1, 3],
+  [1, 3, 5],
+  [3, 1],
+];
+
+const STAB_PATTERNS = [
+  [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+  [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],
+  [0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0],
+  [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+  [0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0],
+];
+
+const OPENING_CHORDS = ["i", "i", "i", "i9", "iv", "v", "VII"];
+
+function pickOne(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function markovFromLoop(loop) {
+  const grid = Array.from({ length: SHAPES.length }, () => Array(SHAPES.length).fill(0));
+  loop.forEach((from, i) => {
+    grid[from][loop[(i + 1) % loop.length]] = 100;
+  });
+  return grid;
+}
+
+function randomizeOpening() {
+  const loop = pickOne(OPENING_LOOPS);
+  state.markov = markovFromLoop(loop);
+  state.shape = loop[0];
+  state.chord = pickOne(OPENING_CHORDS);
+  SEED.stab = pickOne(STAB_PATTERNS).slice();
+}
 
 function weightsFromPattern(pattern, id) {
   const row = Array.from({ length: 16 }, (_, i) => (pattern && pattern[i] ? SEED_HIT : 0));
@@ -1783,6 +1824,7 @@ function syncControls() {
 }
 
 function wire() {
+  randomizeOpening();
   fillStepWeights();
   seedPattern();
   renderGrids();
