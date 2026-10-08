@@ -1732,9 +1732,9 @@ function drawPlate(now) {
   let pulse = music.level;
   if (state.playing && ctx && state.nextTime) {
     const place = soundingPlace();
-    const intoBeat = ((place.col + place.into) / 4) % 1;
-    platePhase = intoBeat * Math.PI * 2;
-    pulse = Math.exp(-intoBeat * 3.2) * 0.85 + music.level * 0.25;
+    const intoBar = ((place.col + place.into) / 16) % 1;
+    platePhase = intoBar * Math.PI * 2;
+    pulse = Math.exp(-intoBar * 2.4) * 0.85 + music.level * 0.25;
     plateEnergy = 0.12 + pulse * 1.35;
   } else {
     const target = 0.12 + music.level * 1.35;
