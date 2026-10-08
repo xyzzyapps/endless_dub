@@ -1686,10 +1686,9 @@ function paintPlateFrame() {
   for (let i = 0; i < count; i++) {
     const m = modes[i][0];
     const n = modes[i][1];
-    const ratio = Math.sqrt(m * m + n * n);
     const band = plateBands[i % plateBands.length];
     const drive = 0.15 + band * 2.4;
-    timeAmp[i] = Math.cos(platePhase * ratio * 0.45) * drive / (1 + i * 0.3);
+    timeAmp[i] = Math.cos(platePhase) * drive / (1 + i * 0.3);
     const col = new Float32Array(w);
     const row = new Float32Array(h);
     for (let x = 0; x < w; x++) col[x] = Math.sin(Math.PI * m * x / xDenom);
@@ -1733,9 +1732,9 @@ function drawPlate(now) {
   let pulse = music.level;
   if (state.playing && ctx && state.nextTime) {
     const place = soundingPlace();
-    const beat = (place.col + place.into) / 4;
-    platePhase = beat * Math.PI * 2 * state.plate.tension;
-    pulse = Math.exp(-place.into * 5.5) * 0.85 + music.level * 0.25;
+    const intoBeat = ((place.col + place.into) / 4) % 1;
+    platePhase = intoBeat * Math.PI * 2;
+    pulse = Math.exp(-intoBeat * 3.2) * 0.85 + music.level * 0.25;
     plateEnergy = 0.12 + pulse * 1.35;
   } else {
     const target = 0.12 + music.level * 1.35;
