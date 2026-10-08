@@ -130,6 +130,7 @@ let recordDest = null;
 let recordCanvas = null;
 let recordCtx = null;
 let videoChunks = [];
+let plateAnim = true;
 let plateEnergy = 0.2;
 let plateStamp = 0;
 let platePhase = 0;
@@ -1759,8 +1760,8 @@ function draw(now) {
   }
   paintPlayhead();
   const stamp = now || performance.now();
-  drawPlate(stamp);
-  if (recording && recordCtx) {
+  if (plateAnim) drawPlate(stamp);
+  if (recording && recordCtx && plateAnim) {
     recordCtx.drawImage($("plate"), 0, 0, recordCanvas.width, recordCanvas.height);
   }
   const canvas = $("scope");
@@ -2038,6 +2039,10 @@ function wire() {
       topPinned = false;
       syncTop(lastPointer);
     }, 4000);
+  });
+  $("plateAnim").addEventListener("click", () => {
+    plateAnim = !plateAnim;
+    $("plateAnim").textContent = plateAnim ? "Plate off" : "Plate on";
   });
   $("hideUi").addEventListener("click", () => {
     document.body.classList.add("plate-only");
