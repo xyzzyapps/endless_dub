@@ -125,6 +125,8 @@ let recordSamples = 0;
 let recording = false;
 let recordStopping = false;
 let recordStamp = "";
+const midiLog = [];
+let midiFrom = 0;
 let mediaRecorder = null;
 let recordDest = null;
 let recordCanvas = null;
@@ -137,6 +139,68 @@ let plateStamp = 0;
 let platePhase = 0;
 const freqBins = new Uint8Array(512);
 const waveBins = new Uint8Array(1024);
+
+function rememberNote(t, dur, note, level, ch) {
+  const n = clamp(Math.round(note), 0, 127);
+  const vel = clamp(Math.round(Math.max(0, level) * 127), 1, 127);
+  midiLog.push({ t, dur: Math.max(0.01, dur), note: n, vel, ch, bpm: state.bpm });
+}
+
+function vlq(n) {
+  let value = Math.max(0, n | 0);
+  const bytes = [value & 0x7f];
+  value >>= 7;
+  while (value > 0) {
+    bytes.push((value & 0x7f) | 0x80);
+    value >>= 7;
+  }
+  return bytes.reverse();
+}
+
+function downloadMidi(from, to) {
+  const taken = midiLog.filter((event) => event.t >= from && event.t < to);
+  if (!taken.length) return;
+  const ppq = 480;
+  const bpm0 = taken[0].bpm || state.bpm || 122;
+  let tick = 0;
+  let prev = from;
+  let bpm = bpm0;
+  const msgs = [];
+  taken.sort((a, b) => a.t - b.t).forEach((event) => {
+    tick += Math.round(Math.max(0, event.t - prev) * (bpm / 60) * ppq);
+    prev = event.t;
+    bpm = event.bpm || bpm;
+    const dur = Math.max(1, Math.round(event.dur * (bpm / 60) * ppq));
+    msgs.push({ tick, data: [0x90 | (event.ch & 15), event.note, event.vel] });
+    msgs.push({ tick: tick + dur, data: [0x80 | (event.ch & 15), event.note, 0] });
+  });
+  msgs.sort((a, b) => a.tick - b.tick || a.data[0] - b.data[0]);
+  const bytes = [];
+  const push = (list) => list.forEach((b) => bytes.push(b));
+  const mpqn = clamp(Math.round(60000000 / bpm0), 1, 0xffffff);
+  push([0x00, 0xff, 0x51, 0x03, (mpqn >> 16) & 255, (mpqn >> 8) & 255, mpqn & 255]);
+  let last = 0;
+  msgs.forEach((msg) => {
+    push(vlq(msg.tick - last));
+    push(msg.data);
+    last = msg.tick;
+  });
+  push(vlq(0));
+  push([0xff, 0x2f, 0x00]);
+  const file = new Uint8Array(14 + 8 + bytes.length);
+  const view = new DataView(file.buffer);
+  file.set([0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, (ppq >> 8) & 255, ppq & 255], 0);
+  file.set([0x4d, 0x54, 0x72, 0x6b], 14);
+  view.setUint32(18, bytes.length);
+  file.set(bytes, 22);
+  const blob = new Blob([file], { type: "audio/midi" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "endless-dub-" + (recordStamp || "take") + ".mid";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
 
 function midiToHz(m) {
   return 440 * Math.pow(2, (m - 69) / 12);
@@ -651,6 +715,7 @@ function fireKick(t) {
   p.exponentialRampToValueAtTime(body, when + 0.004);
   p.exponentialRampToValueAtTime(0.0001, when + Math.max(0.005, kickLen));
   retrigger(v.cg.gain, when, 0.002, 0, 0.018, 0.28 * state.lvl.kick);
+  rememberNote(when, kickLen, 36, state.lvl.kick, 9);
   const duckG = duck.gain;
   duckG.cancelScheduledValues(when);
   duckG.setValueAtTime(1, when);
@@ -672,6 +737,7 @@ function fireHat(t, open) {
     v.bg.gain.cancelScheduledValues(when);
     v.bg.gain.setValueAtTime(0.0001, when);
   }
+  rememberNote(when, dur, open ? 46 : 42, level, 9);
 }
 
 function fireSnare(t) {
@@ -689,15 +755,13 @@ function fireSnare(t) {
     retrigger(v.bursts[i].gain, whenDue(when + offset), 0.002, 0, Math.max(0.02, snLen * (0.7 - i * 0.15)), (0.22 - i * 0.04) * sn);
   });
   retrigger(v.send.gain, when, 0.002, 0, Math.max(0.001, snLen * 0.8), 0.16 * sn);
+  rememberNote(when, snLen, 38, sn, 9);
 }
 
 function fireBass(t, step) {
   const when = whenDue(t);
   const v = takeVoice(mobileVoices.bass);
-  const root = state.root - 24;
-  let note = root;
-  if (step === 8 || step === 10) note = root + 7;
-  if (step % 7 === 6) note = root + (Math.random() < 0.5 ? 0 : 7);
+  const note = bassMidi(step);
   v.freeAt = when + state.len.bass * 1.15;
   const hz = midiToHz(note);
   v.o.frequency.cancelScheduledValues(when);
@@ -706,6 +770,7 @@ function fireBass(t, step) {
   v.sub.frequency.setValueAtTime(midiToHz(note - 12), when);
   retrigger(v.g.gain, when, 0.012, 0.05, state.len.bass, 0.55 * state.bassLvl);
   retrigger(v.g2.gain, when, 0.02, 0.08, state.len.bass * 1.15, 0.45 * state.bassLvl);
+  rememberNote(when, state.len.bass, note, state.bassLvl, 0);
 }
 
 function playKick(t) {
@@ -722,6 +787,7 @@ function playKick(t) {
   o.connect(g); g.connect(drumBus);
   o.start(t); o.stop(t + kickLen + 0.03);
   noiseBurst(t, 0.018, "highpass", 1800, 0.7, 0.28 * state.lvl.kick, drumBus);
+  rememberNote(t, kickLen, 36, state.lvl.kick, 9);
 
   const duckG = duck.gain;
   duckG.cancelScheduledValues(t);
@@ -737,6 +803,7 @@ function playHat(t, open) {
   const level = open ? state.lvl.open : state.lvl.hat;
   const dur = open ? state.len.open : state.len.hat;
   noiseBurst(when, dur, "highpass", open ? 5200 : 8000, 0.55, (open ? 0.16 : 0.07) * level, drumBus);
+  rememberNote(when, dur, open ? 46 : 42, level, 9);
   if (open) noiseBurst(when, dur * 0.7, "bandpass", 9000, 0.7, 0.05 * level, drumBus);
 }
 
@@ -758,6 +825,7 @@ function playSnare(t) {
     noiseBurst(t + offset, Math.max(0.02, snLen * (0.7 - i * 0.15)), "bandpass", 1800, 0.8, (0.22 - i * 0.04) * sn, drumBus);
   });
   noiseBurst(t, snLen * 0.8, "highpass", 2500, 0.5, 0.16 * sn, delaySend);
+  rememberNote(t, snLen, 38, sn, 9);
 }
 
 function playRim(t) {
@@ -768,14 +836,20 @@ function playRim(t) {
   g.connect(drumBus);
   src.start(t);
   src.stop(t + state.len.rim + 0.03);
+  rememberNote(t, state.len.rim, 37, state.lvl.rim, 9);
 }
 
-function playBass(t, step) {
-  if (mobileVoices) return fireBass(t, step);
+function bassMidi(step) {
   const root = state.root - 24;
   let note = root;
   if (step === 8 || step === 10) note = root + 7;
   if (step % 7 === 6) note = root + (Math.random() < 0.5 ? 0 : 7);
+  return note;
+}
+
+function playBass(t, step) {
+  if (mobileVoices) return fireBass(t, step);
+  const note = bassMidi(step);
   const o = ctx.createOscillator();
   const sub = ctx.createOscillator();
   o.type = "sine";
@@ -792,6 +866,7 @@ function playBass(t, step) {
   sub.connect(g2); g2.connect(musicBus);
   o.start(t); sub.start(t);
   o.stop(t + bassLen + 0.15); sub.stop(t + bassLen * 1.15 + 0.15);
+  rememberNote(t, bassLen, note, state.bassLvl, 0);
 }
 
 function stabNotes() {
@@ -965,6 +1040,7 @@ function playStab(t) {
   g.connect(reverbSend);
   const ref = midiToHz(STAB_REF);
   notes.forEach((n, idx) => {
+    rememberNote(t, decay, n, state.lvl.stab, 1);
     const src = ctx.createBufferSource();
     src.buffer = stabBuf;
     src.playbackRate.setValueAtTime(midiToHz(n) / ref, t);
@@ -1164,6 +1240,8 @@ function playPlate(t) {
   send.connect(delaySend);
   src.start(t);
   src.stop(t + (ring + 0.06) / Math.max(0.05, f0 / PLATE_REF) + 0.02);
+  const plateNote = state.root + 12 + 12 * Math.log2(Math.max(0.05, state.plate.tension));
+  rememberNote(t, ring, plateNote, state.lvl.plate, 2);
 }
 
 function playStep(step, t) {
@@ -1437,6 +1515,7 @@ function stopRecording() {
   $("record").textContent = "Record";
   $("record").classList.remove("recording");
   downloadWav();
+  downloadMidi(midiFrom, ctx ? ctx.currentTime : midiFrom);
   recordChunks = [];
   recordSamples = 0;
   recordStopping = false;
@@ -1449,6 +1528,7 @@ function startRecording() {
   recordChunks = [];
   recordSamples = 0;
   recordStamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  midiFrom = ctx.currentTime;
   try { startVideo(); } catch (err) {
     recordCtx = null;
     if (recordDest) {
