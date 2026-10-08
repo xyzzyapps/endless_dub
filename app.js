@@ -1649,6 +1649,22 @@ function musicDrive() {
   return { level, bands };
 }
 
+function audibleNow() {
+  if (!ctx) return 0;
+  const raw = Number.isFinite(ctx.outputLatency) ? ctx.outputLatency : (ctx.baseLatency || 0);
+  return ctx.currentTime - Math.min(0.3, Math.max(0, raw));
+}
+
+function soundingPlace() {
+  const sixteenth = (60 / state.bpm) / 4;
+  const ahead = (state.nextTime - audibleNow()) / sixteenth;
+  const stepsAhead = Math.ceil(ahead);
+  return {
+    col: (state.step - stepsAhead + 1600) % 16,
+    into: stepsAhead - ahead,
+  };
+}
+
 function drawPlate(now) {
   fitPlate();
   const canvas = $("plate");
@@ -1658,10 +1674,19 @@ function drawPlate(now) {
   const dt = plateStamp ? Math.min(0.05, (now - plateStamp) / 1000) : 0.016;
   plateStamp = now;
   const music = musicDrive();
-  const target = 0.12 + music.level * 1.35;
-  const follow = music.level > plateEnergy ? 18 : 4;
-  plateEnergy += (target - plateEnergy) * Math.min(1, dt * follow);
-  platePhase += dt * (0.35 + music.level * 7) * state.plate.tension;
+  let pulse = music.level;
+  if (state.playing && ctx && state.nextTime) {
+    const place = soundingPlace();
+    const beat = (place.col + place.into) / 4;
+    platePhase = beat * Math.PI * 2 * state.plate.tension;
+    pulse = Math.exp(-place.into * 5.5) * 0.85 + music.level * 0.25;
+    plateEnergy = 0.12 + pulse * 1.35;
+  } else {
+    const target = 0.12 + music.level * 1.35;
+    const follow = music.level > plateEnergy ? 18 : 4;
+    plateEnergy += (target - plateEnergy) * Math.min(1, dt * follow);
+    platePhase += dt * 0.35 * state.plate.tension;
+  }
   const img = c.createImageData(w, h);
   const data = img.data;
   const modes = PLATE_MODES.slice(0, state.plate.order);
@@ -1713,9 +1738,7 @@ function paintPlayhead() {
   if (window.CsoundDub && CsoundDub.on) {
     col = state.playing ? CsoundDub.step : -1;
   } else if (state.playing && ctx && state.nextTime) {
-    const sixteenth = (60 / state.bpm) / 4;
-    const ahead = (state.nextTime - ctx.currentTime) / sixteenth;
-    col = (state.step - Math.ceil(ahead) + 160) % 16;
+    col = soundingPlace().col;
   }
   if (col === shownCol) return;
   shownCol = col;
