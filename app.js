@@ -131,6 +131,7 @@ let recordCanvas = null;
 let recordCtx = null;
 let videoChunks = [];
 let plateAnim = true;
+let plateBands = [0, 0, 0, 0, 0, 0];
 let plateEnergy = 0.2;
 let plateStamp = 0;
 let platePhase = 0;
@@ -1305,6 +1306,7 @@ function applyBase(hex) {
   document.querySelectorAll(".swatch").forEach((btn) => {
     btn.classList.toggle("on", btn.dataset.color.toLowerCase() === hex.toLowerCase());
   });
+  if (!plateAnim) repaintPlateStill();
 }
 
 function writeAscii(view, offset, text) {
@@ -1666,28 +1668,12 @@ function soundingPlace() {
   };
 }
 
-function drawPlate(now) {
+function paintPlateFrame() {
   fitPlate();
   const canvas = $("plate");
   const c = canvas.getContext("2d", { alpha: false });
   const w = canvas.width;
   const h = canvas.height;
-  const dt = plateStamp ? Math.min(0.05, (now - plateStamp) / 1000) : 0.016;
-  plateStamp = now;
-  const music = musicDrive();
-  let pulse = music.level;
-  if (state.playing && ctx && state.nextTime) {
-    const place = soundingPlace();
-    const beat = (place.col + place.into) / 4;
-    platePhase = beat * Math.PI * 2 * state.plate.tension;
-    pulse = Math.exp(-place.into * 5.5) * 0.85 + music.level * 0.25;
-    plateEnergy = 0.12 + pulse * 1.35;
-  } else {
-    const target = 0.12 + music.level * 1.35;
-    const follow = music.level > plateEnergy ? 18 : 4;
-    plateEnergy += (target - plateEnergy) * Math.min(1, dt * follow);
-    platePhase += dt * 0.35 * state.plate.tension;
-  }
   const img = c.createImageData(w, h);
   const data = img.data;
   const modes = PLATE_MODES.slice(0, state.plate.order);
@@ -1701,7 +1687,7 @@ function drawPlate(now) {
     const m = modes[i][0];
     const n = modes[i][1];
     const ratio = Math.sqrt(m * m + n * n);
-    const band = music.bands[i % music.bands.length];
+    const band = plateBands[i % plateBands.length];
     const drive = 0.15 + band * 2.4;
     timeAmp[i] = Math.cos(platePhase * ratio * 0.45) * drive / (1 + i * 0.3);
     const col = new Float32Array(w);
@@ -1730,6 +1716,34 @@ function drawPlate(now) {
     }
   }
   c.putImageData(img, 0, 0);
+}
+
+function repaintPlateStill() {
+  paintPlateFrame();
+  if (recording && recordCtx) {
+    recordCtx.drawImage($("plate"), 0, 0, recordCanvas.width, recordCanvas.height);
+  }
+}
+
+function drawPlate(now) {
+  const dt = plateStamp ? Math.min(0.05, (now - plateStamp) / 1000) : 0.016;
+  plateStamp = now;
+  const music = musicDrive();
+  plateBands = music.bands;
+  let pulse = music.level;
+  if (state.playing && ctx && state.nextTime) {
+    const place = soundingPlace();
+    const beat = (place.col + place.into) / 4;
+    platePhase = beat * Math.PI * 2 * state.plate.tension;
+    pulse = Math.exp(-place.into * 5.5) * 0.85 + music.level * 0.25;
+    plateEnergy = 0.12 + pulse * 1.35;
+  } else {
+    const target = 0.12 + music.level * 1.35;
+    const follow = music.level > plateEnergy ? 18 : 4;
+    plateEnergy += (target - plateEnergy) * Math.min(1, dt * follow);
+    platePhase += dt * 0.35 * state.plate.tension;
+  }
+  paintPlateFrame();
 }
 
 let shownCol = -1;
